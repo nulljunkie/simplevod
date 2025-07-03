@@ -1,0 +1,8 @@
+# SimpleVOD
+# Replace this IP with your ingress IP
+192.168.49.2 simplevod.app
+192.168.49.2 auth.simplevod.app
+192.168.49.2 upload.simplevod.app
+192.168.49.2 videos.simplevod.app
+192.168.49.2 console.minio.simplevod.app
+192.168.49.2 api.minio.simplevod.app

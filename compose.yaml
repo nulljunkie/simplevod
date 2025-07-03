@@ -1,0 +1,62 @@
+services:
+
+  frontend:
+    build:
+      context: ./frontend/
+    image: simplevod/frontend:latest
+
+  auth:
+    build:
+      context: ./auth/
+    image: simplevod/auth:latest
+
+  users:
+    build:
+      context: ./users/
+    image: simplevod/users:latest
+
+  celery:
+    build:
+      context: ./users/
+    image: simplevod/users-celery:latest
+
+  upload:
+    build:
+      context: ./upload/
+    image: simplevod/upload:latest
+
+  playlist:
+    build:
+      context: ./playlist/
+    image: simplevod/playlist:latest
+
+  iframebreaker:
+    build:
+      context: ./iframebreaker/
+    image: simplevod/iframebreaker:latest
+
+  transcoder:
+    build:
+      context: ./transcoder/
+    image: simplevod/transcoder:latest
+
+  videos:
+    build:
+      context: ./videos/
+    image: simplevod/videos:latest
+
+  finalizer:
+    build:
+      context: ./finalizer/
+    image: simplevod/finalizer:latest
+
+  transcode:
+    build:
+      context: ./transcode/
+    image: simplevod/transcode:latest
+
+  net-tools:
+    build: 
+      context: ./artifacts/
+      dockerfile: Dockerfile.net-tools
+    image: net-tools:latest

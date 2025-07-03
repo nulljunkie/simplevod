@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "upload.fullname" . }}
+  labels:
+    {{- include "upload.labels" . | nindent 4 }}
+spec:
+  type: {{ .Values.global.upload.service.type | default .Values.service.type }}
+  ports:
+    - port: {{ include "upload.port" . }}
+      targetPort: http
+      protocol: TCP
+      name: http
+  selector:
+    {{- include "upload.selectorLabels" . | nindent 4 }}

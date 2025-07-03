@@ -1,0 +1,49 @@
+syntax = "proto3";
+
+package users;
+
+service UserService {
+  rpc GetUserByEmail(GetUserByEmailRequest) returns (GetUserByEmailResponse);
+  rpc CreateUser(CreateUserRequest) returns (CreateUserResponse);
+  rpc ActivateUser(ActivateUserRequest) returns (ActivateUserResponse);
+  rpc ResendActivationEmail(ResendActivationEmailRequest) returns (ResendActivationEmailResponse);
+}
+
+message GetUserByEmailRequest {
+  string email = 1;
+}
+
+message GetUserByEmailResponse {
+  int32 user_id = 1;
+  string email = 2;
+  string username = 3;
+  string hashed_password = 4;
+  bool is_active = 5;
+}
+
+message CreateUserRequest {
+  string email = 1;
+  string password = 2;
+}
+
+message CreateUserResponse {
+  int32 user_id = 1;
+  string message = 2;
+}
+
+message ActivateUserRequest {
+  string token = 1;
+}
+
+message ActivateUserResponse {
+  int32 user_id = 1;
+  string message = 2;
+}
+
+message ResendActivationEmailRequest {
+  string email = 1;
+}
+
+message ResendActivationEmailResponse {
+  string message = 1;
+}

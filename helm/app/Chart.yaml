@@ -1,0 +1,52 @@
+apiVersion: v2
+name: simplevod
+description: Simple VOD Helm Chart
+type: application
+version: 0.1.0
+appVersion: "1.0.0"
+dependencies:
+  - name: minio
+    version: "16.0.7"
+    # repository: "https://charts.bitnami.com/bitnami"
+    repository: http://127.0.0.1:4444
+  # - name: mongodb
+  #   version: "15.6.15"
+  #   repository: "https://charts.bitnami.com/bitnami"
+  #   condition: mongodb.enabled
+  # - name: rabbitmq
+  #   version: "14.6.6"
+  #   repository: "https://charts.bitnami.com/bitnami"
+  #   condition: rabbitmq.enabled
+  - name: postgresql
+    version: "16.6.3"
+    # repository: "https://charts.bitnami.com/bitnami"
+    repository: http://127.0.0.1:4444
+    alias: postgresql_users
+  - name: redis
+    version: "20.11.5"
+    # repository: "https://charts.bitnami.com/bitnami"
+    repository: http://127.0.0.1:4444
+    alias: redis_users
+  - name: redis
+    version: "20.11.5"
+    # repository: "https://charts.bitnami.com/bitnami"
+    repository: http://127.0.0.1:4444
+    alias: redis_upload
+  - name: redis
+    version: "20.11.5"
+    # repository: "https://charts.bitnami.com/bitnami"
+    repository: http://127.0.0.1:4444
+    alias: redis_transcode
+  - name: users
+    version: "0.1.0"
+    respository: file://charts/users
+  - name: auth
+    version: "0.1.0"
+    respository: file://charts/auth
+  - name: frontend
+    version: "0.1.0"
+    respository: file://charts/frontend
+
+maintainers:
+  - name: SimpleVOD
+    email: team@simplevod.com

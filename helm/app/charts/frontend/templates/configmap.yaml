@@ -1,0 +1,21 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "frontend.fullname" . }}-nuxt-env
+  labels:
+    {{- include "frontend.labels" . | nindent 4 }}
+data:
+  # Server-side URLs (internal cluster communication)
+  nuxt_auth_service_url: {{ printf "http://%s-%s.%s:%d/api" .Release.Name .Values.global.auth.nameOverride .Release.Namespace ( int .Values.global.auth.service.port ) | quote }}
+  nuxt_stream_service_url: {{ printf "http://%s-%s.%s:%d/api" .Release.Name .Values.global.videos.nameOverride .Release.Namespace ( int .Values.global.videos.service.port ) | quote }}
+  nuxt_upload_service_url: {{ printf "http://%s-%s.%s:%d/upload" .Release.Name .Values.global.upload.nameOverride .Release.Namespace ( int .Values.global.upload.service.port ) | quote }}
+  
+  # Client-side URLs (external ingress)
+  nuxt_public_auth_service_url: {{ printf "https://%s/api" .Values.global.auth.ingressHost | quote }}
+  nuxt_public_stream_service_url: {{ printf "https://%s/api" .Values.global.videos.ingressHost | quote }}
+  nuxt_public_upload_service_url: {{ printf "https://%s/upload" .Values.global.upload.ingressHost | quote }}
+  
+  # App configuration
+  nuxt_public_upload_chunk_size_mb: {{ .Values.upload.chunkSize | quote }}
+  nuxt_public_upload_concurrent_chunks: {{ .Values.upload.concurrentChunks | quote }}
+  nuxt_public_app_name: {{ .Values.global.appName | default "SimpleVOD" | quote }}

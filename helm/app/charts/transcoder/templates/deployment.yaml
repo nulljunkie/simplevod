@@ -1,0 +1,249 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "transcoder.fullname" . }}
+  labels:
+    {{- include "transcoder.labels" . | nindent 4 }}
+spec:
+  {{- if not .Values.autoscaling.enabled }}
+  replicas: {{ .Values.replicaCount }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "transcoder.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        {{- include "transcoder.labels" . | nindent 8 }}
+        {{- with .Values.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "transcoder.serviceAccountName" . }}
+      {{- with .Values.podSecurityContext }}
+      securityContext:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: {{ .Chart.Name }}
+          {{- with .Values.securityContext }}
+          securityContext:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.service.port }}
+              protocol: TCP
+          env:
+
+
+            - name: MINIO_ENDPOINT
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ include "transcoder.fullname" . }}
+                  key: minio_endpoint
+            - name: MINIO_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "transcoder.fullname" . }}
+                  key: minio_access_key
+            - name: MINIO_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "transcoder.fullname" . }}
+                  key: minio_secret_key
+            - name: MINIO_USE_SSL
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ include "transcoder.fullname" . }}
+                  key: minio_use_ssl
+            - name: MINIO_OUTPUT_BUCKET
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ include "transcoder.fullname" . }}
+                  key: minio_output_bucket
+
+
+
+            # TODO: ADD ME
+            - name: MC_ALIAS
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ include "transcoder.fullname" . }}
+                  key: mc_alias
+
+            - name: MINIO_SECRET_NAME
+              value: {{ printf "%s-mc" ( include "transcoder.fullname" . )}}
+
+            - name: RABBITMQ_ADMIN_SECRET_NAME
+              value: {{ printf "%s-rabbitmqadmin" ( include "transcoder.fullname" . )}}
+  
+
+
+            - name: RABBITMQ_HOST
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ include "transcoder.fullname" . }}
+                  key: rabbitmq_host
+            - name: RABBITMQ_PORT
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ include "transcoder.fullname" . }}
+                  key: rabbitmq_port
+            - name: RABBITMQ_VHOST
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ include "transcoder.fullname" . }}
+                  key: rabbitmq_vhost
+            - name: RABBITMQ_USER
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "transcoder.fullname" . }}
+                  key: rabbitmq_user
+            - name: RABBITMQ_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "transcoder.fullname" . }}
+                  key: rabbitmq_password
+            - name: RABBITMQ_CONSUME_QUEUE
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ include "transcoder.fullname" . }}
+                  key: rabbitmq_consume_queue
+            - name: RABBITMQ_PREFETCH
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ include "transcoder.fullname" . }}
+                  key: rabbitmq_prefetch
+  
+
+
+            - name: REDIS_HOST
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ include "transcoder.fullname" . }}
+                  key: redis_host
+            - name: REDIS_PORT
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ include "transcoder.fullname" . }}
+                  key: redis_port
+            - name: REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "transcoder.fullname" . }}
+                  key: redis_password
+            - name: REDIS_DB
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ include "transcoder.fullname" . }}
+                  key: redis_db
+  
+
+            - name: TRANSCODE_IMAGE
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ include "transcoder.fullname" . }}
+                  key: transcode_image
+            - name: TRANSCODE_PRESET
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ include "transcoder.fullname" . }}
+                  key: transcode_preset
+            - name: RESOLUTIONS
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ include "transcoder.fullname" . }}
+                  key: resolutions
+            - name: CRF_MAP
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ include "transcoder.fullname" . }}
+                  key: crf_map
+            - name: MASTER_PLAYLIST
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ include "transcoder.fullname" . }}
+                  key: master_playlist
+  
+
+            - name: MAX_CONCURRENT_HANDLERS
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ include "transcoder.fullname" . }}
+                  key: max_concurrent_handlers
+            - name: RETRY_INTERVAL
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ include "transcoder.fullname" . }}
+                  key: retry_interval
+
+            # TODO:  INSPECT ME
+            - name: KUBERNETES_NAMESPACE
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ include "transcoder.fullname" . }}
+                  key: kubernetes_namespace
+  
+
+            - name: MC_CONFIG_INIT_IMAGE
+              value: {{ .Values.transcode.initImage | quote }}
+ 
+            - name: DEFAULT_MINIO_ALIAS
+              value: {{ .Values.minio.mcAlias | quote }}
+ 
+            - name: "DEFAULT_RABBITMQ_EXCHANGE"
+              value: {{ .Values.transcode.rabbitmq.exchange | quote }}
+ 
+            - name: "DEFAULT_RABBITMQ_ROUTING_KEY"
+              value: {{ .Values.transcode.rabbitmq.routingKey | quote }}
+ 
+            - name: "ALLOW_HTTP_JOB_ARG"
+              value: {{ .Values.transcode.allowHttp | quote }}
+ 
+
+
+
+
+          {{- with .Values.livenessProbe }}
+          livenessProbe:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.readinessProbe }}
+          readinessProbe:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.volumeMounts }}
+          volumeMounts:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+      {{- with .Values.volumes }}
+      volumes:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

@@ -1,0 +1,28 @@
+[req]
+default_bits       = 2048
+distinguished_name = req_distinguished_name
+req_extensions     = req_ext
+x509_extensions    = v3_req
+prompt             = no
+
+[req_distinguished_name]
+C = US
+ST = SomeState
+L = SomeCity
+O = SimpleVOD
+OU = Dev
+CN = simplevod.app
+
+[req_ext]
+subjectAltName = @alt_names
+
+[v3_req]
+subjectAltName = @alt_names
+
+[alt_names]
+DNS.1 = simplevod.app
+DNS.2 = auth.simplevod.app
+DNS.3 = upload.simplevod.app
+DNS.4 = videos.simplevod.app
+DNS.5 = console.minio.simplevod.app
+DNS.6 = api.minio.simplevod.app

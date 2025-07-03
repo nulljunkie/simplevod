@@ -1,0 +1,139 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "frontend.fullname" . }}
+  labels:
+    {{- include "frontend.labels" . | nindent 4 }}
+spec:
+  {{- if not .Values.autoscaling.enabled }}
+  replicas: {{ .Values.replicaCount }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "frontend.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        {{- include "frontend.labels" . | nindent 8 }}
+        {{- with .Values.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "frontend.serviceAccountName" . }}
+      {{- with .Values.podSecurityContext }}
+      securityContext:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: {{ .Chart.Name }}
+          {{- with .Values.securityContext }}
+          securityContext:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          {{- if .Values.command }}
+          command:
+            {{- range .Values.command }}
+            - {{ . | quote }}
+            {{- end }}
+          {{- end }}
+          {{- if .Values.args }}
+          args:
+            {{- range .Values.args }}
+            - {{ . | quote }}
+            {{- end }}
+          {{- end }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.service.port }}
+              protocol: TCP
+          env:
+            # Server-side URLs (internal cluster)
+            - name: NUXT_AUTH_SERVICE_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ include "frontend.fullname" . }}-nuxt-env
+                  key: nuxt_auth_service_url
+            - name: NUXT_STREAM_SERVICE_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ include "frontend.fullname" . }}-nuxt-env
+                  key: nuxt_stream_service_url
+            - name: NUXT_UPLOAD_SERVICE_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ include "frontend.fullname" . }}-nuxt-env
+                  key: nuxt_upload_service_url
+            # Client-side URLs (external ingress)
+            - name: NUXT_PUBLIC_AUTH_SERVICE_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ include "frontend.fullname" . }}-nuxt-env
+                  key: nuxt_public_auth_service_url
+            - name: NUXT_PUBLIC_STREAM_SERVICE_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ include "frontend.fullname" . }}-nuxt-env
+                  key: nuxt_public_stream_service_url
+            - name: NUXT_PUBLIC_UPLOAD_SERVICE_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ include "frontend.fullname" . }}-nuxt-env
+                  key: nuxt_public_upload_service_url
+            # App configuration
+            - name: NUXT_PUBLIC_UPLOAD_CHUNK_SIZE_MB
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ include "frontend.fullname" . }}-nuxt-env
+                  key: nuxt_public_upload_chunk_size_mb
+            - name: NUXT_PUBLIC_UPLOAD_CONCURRENT_CHUNKS
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ include "frontend.fullname" . }}-nuxt-env
+                  key: nuxt_public_upload_concurrent_chunks
+            - name: NUXT_PUBLIC_APP_NAME
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ include "frontend.fullname" . }}-nuxt-env
+                  key: nuxt_public_app_name
+          {{- with .Values.livenessProbe }}
+          livenessProbe:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.readinessProbe }}
+          readinessProbe:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.volumeMounts }}
+          volumeMounts:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+      {{- with .Values.volumes }}
+      volumes:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

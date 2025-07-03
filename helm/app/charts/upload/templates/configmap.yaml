@@ -1,0 +1,18 @@
+{{- if not .Values.existingConfigmap }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "upload.fullname" . }}
+  labels:
+    {{- include "upload.labels" . | nindent 4 }}
+data:
+  # minio_endpoint: {{ printf "%s-%s.%s:9000" .Release.Name .Values.global.minio.nameOverride .Release.Namespace | quote }}
+  minio_endpoint: {{ printf "%s-%s.%s" .Release.Name .Values.global.minio.nameOverride .Release.Namespace | quote }}
+  minio_bucket: {{ .Values.minio.bucket | quote }}
+  minio_use_ssl: {{ .Values.minio.use_ssl | quote }}
+  redis_host: {{ printf "%s-%s-master.%s" .Release.Name .Values.global.redis_upload.nameOverride .Release.Namespace | quote }}
+  redis_port: {{ .Values.redis.port | quote }}
+  redis_db: {{ .Values.redis.db | quote }}
+  mongo_host: {{ printf "%s-%s.%s" .Release.Name .Values.global.mongodb.nameOverride .Release.Namespace | quote }}
+  minio_external_endpoint: {{ .Values.minio.externalEndpoint | quote }}
+{{- end }}

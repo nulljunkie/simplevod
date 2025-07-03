@@ -1,0 +1,18 @@
+FROM alpine:latest
+
+RUN apk add --no-cache \
+    curl \
+    wget \
+    bind-tools \
+    tcpdump \
+    netcat-openbsd \
+    iproute2 \
+    net-tools \
+    jq \
+    hey \ 
+    redis
+
+RUN curl -sSL https://dl.min.io/client/mc/release/linux-amd64/mc -o /usr/bin/mc && \
+        chmod +x /usr/bin/mc
+
+CMD ["/bin/sh"]

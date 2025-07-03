@@ -1,0 +1,194 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "upload.fullname" . }}
+  labels:
+    {{- include "upload.labels" . | nindent 4 }}
+spec:
+  {{- if not .Values.autoscaling.enabled }}
+  replicas: {{ .Values.replicaCount }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "upload.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        {{- include "upload.labels" . | nindent 8 }}
+        {{- with .Values.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "upload.serviceAccountName" . }}
+      {{- with .Values.podSecurityContext }}
+      securityContext:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: {{ .Chart.Name }}
+          {{- with .Values.securityContext }}
+          securityContext:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          {{- if .Values.command }}
+          command:
+            {{- range .Values.command }}
+            - {{ . | quote }}
+            {{- end }}
+          {{- end }}
+          {{- if .Values.args }}
+          args:
+            {{- range .Values.args }}
+            - {{ . | quote }}
+            {{- end }}
+          {{- end }}
+          ports:
+            - name: http
+              containerPort: {{ include "upload.port" . }}
+              protocol: TCP
+          env: 
+            - name: MINIO_ENDPOINT
+              value: {{ .Values.minio.endpoint }}
+            - name: MINIO_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  {{- if .Values.existingSecret }}
+                  name: {{ .Values.existingSecret }}
+                  {{- else }}
+                  name: {{ include "upload.fullname" . }}
+                  {{- end }}
+                  key: minio_access_key
+            - name: MINIO_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  {{- if .Values.existingSecret }}
+                  name: {{ .Values.existingSecret }}
+                  {{- else }}
+                  name: {{ include "upload.fullname" . }}
+                  {{- end }}
+                  key: minio_secret_key
+            - name: MINIO_BUCKET
+              valueFrom:
+                configMapKeyRef:
+                  {{- if .Values.existingConfigmap }}
+                  name: {{ .Values.existingConfigmap }}
+                  {{- else }}
+                  name: {{ include "upload.fullname" . }}
+                  {{- end }}
+                  key: minio_bucket
+            - name: MINIO_USE_SSL
+              valueFrom:
+                configMapKeyRef:
+                  {{- if .Values.existingConfigmap }}
+                  name: {{ .Values.existingConfigmap }}
+                  {{- else }}
+                  name: {{ include "upload.fullname" . }}
+                  {{- end }}
+                  key: minio_use_ssl
+            - name: MONGO_URL
+              valueFrom:
+                secretKeyRef:
+                  {{- if .Values.existingSecret }}
+                  name: {{ .Values.existingSecret }}
+                  {{- else }}
+                  name: {{ include "upload.fullname" . }}
+                  {{- end }}
+                  key: mongo_url
+            - name: REDIS_HOST
+              valueFrom:
+                configMapKeyRef:
+                  {{- if .Values.existingConfigmap }}
+                  name: {{ .Values.existingConfigmap }}
+                  {{- else }}
+                  name: {{ include "upload.fullname" . }}
+                  {{- end }}
+                  key: redis_host
+            - name: REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  {{- if .Values.existingSecret }}
+                  name: {{ .Values.existingSecret }}
+                  {{- else }}
+                  name: {{ include "upload.fullname" . }}
+                  {{- end }}
+                  key: redis_password
+            - name: REDIS_PORT
+              valueFrom:
+                configMapKeyRef:
+                  {{- if .Values.existingConfigmap }}
+                  name: {{ .Values.existingConfigmap }}
+                  {{- else }}
+                  name: {{ include "upload.fullname" . }}
+                  {{- end }}
+                  key: redis_port
+            - name: REDIS_DB
+              valueFrom:
+                configMapKeyRef:
+                  {{- if .Values.existingConfigmap }}
+                  name: {{ .Values.existingConfigmap }}
+                  {{- else }}
+                  name: {{ include "upload.fullname" . }}
+                  {{- end }}
+                  key: redis_db
+            - name: JWT_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  {{- if .Values.existingSecret }}
+                  name: {{ .Values.existingSecret }}
+                  {{- else }}
+                  name: {{ include "upload.fullname" . }}
+                  {{- end }}
+                  key: jwt_secret_key
+            - name: JWT_ALGORITHM
+              valueFrom:
+                secretKeyRef:
+                  {{- if .Values.existingSecret }}
+                  name: {{ .Values.existingSecret }}
+                  {{- else }}
+                  name: {{ include "upload.fullname" . }}
+                  {{- end }}
+                  key: jwt_algorithm
+            - name: UVICORN_RELOAD
+              value: "false"
+          {{- with .Values.livenessProbe }}
+          livenessProbe:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.readinessProbe }}
+          readinessProbe:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.volumeMounts }}
+          volumeMounts:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+      {{- with .Values.volumes }}
+      volumes:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

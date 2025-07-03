@@ -1,0 +1,23 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "finalizer.fullname" . }}
+  labels:
+    {{- include "finalizer.labels" . | nindent 4 }}
+data:
+  minio_endpoint: {{ printf "%s-%s.%s:9000" .Release.Name .Values.global.minio.nameOverride .Release.Namespace | quote }}
+  minio_stream_bucket: {{ .Values.minio.bucket | quote }}
+
+  mongo_db_name: {{ .Values.mongodb.database | quote }}
+
+  rabbitmq_host: {{ printf "%s-%s.%s" .Release.Name .Values.global.rabbitmq.nameOverride .Release.Namespace | quote }}
+  rabbitmq_port: {{ .Values.rabbitmq.port | quote }}
+  rabbitmq_vhost: {{ .Values.rabbitmq.vhost | quote }}
+  rabbitmq_consume_queue: {{ .Values.rabbitmq.queue | quote }} 
+
+  redis_host: {{ printf "%s-%s-master.%s" .Release.Name .Values.global.redis_transcode.nameOverride .Release.Namespace | quote }}
+  redis_port: {{ .Values.redis.port | quote }}
+  redis_db: {{ .Values.redis.db | quote }}
+  {{- if .Values.healthCheck.enabled }}
+  health_port: {{ .Values.healthCheck.port | quote }}
+  {{- end }} 

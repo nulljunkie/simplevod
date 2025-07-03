@@ -1,0 +1,122 @@
+{{- /*
+Copyright Broadcom, Inc. All Rights Reserved.
+SPDX-License-Identifier: APACHE-2.0
+*/}}
+
+{{- if .Values.provisioning.enabled }}
+{{- $fullname := printf "%s-provisioning" (include "common.names.fullname" .) }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ $fullname }}
+  namespace: {{ include "common.names.namespace" . | quote }}
+  labels: {{- include "common.labels.standard" (dict "customLabels" .Values.commonLabels "context" .) | nindent 4 }}
+    app.kubernetes.io/component: minio-provisioning
+  {{- if .Values.commonAnnotations }}
+  annotations: {{- include "common.tplvalues.render" (dict "value" .Values.commonAnnotations "context" .) | nindent 4 }}
+  {{- end }}
+data:
+  {{- range $bucket := .Values.provisioning.buckets }}
+  {{- if and $bucket.lifecycle (gt (len $bucket.lifecycle) 0) }}
+  bucket-{{ $bucket.name }}.json: |
+    {
+      "Rules": [
+        {{- range $idx, $lifecycle := $bucket.lifecycle }}
+        {{- if not (empty $lifecycle.id) }}
+        {{- if gt $idx 0 }},{{- end }}
+        {
+          "ID": {{ $lifecycle.id | quote }},
+          "Status": {{ ternary "Disabled" "Enabled" (and (not (empty $lifecycle.disabled)) $lifecycle.disabled) | quote }}
+          {{- with $lifecycle.expiry }}
+          {{- if or .date .days }}
+          ,
+          "Expiration": {
+            {{- with .date }}
+            "Date": {{ . | quote }}
+            {{- end }}
+            {{- if and .date .days }},{{- end }}
+            {{- with .days }}
+            "Days": {{ . }}
+            {{- end }}
+          }
+          {{- end }}
+          {{- end }}
+          {{- with $lifecycle.expiry.nonconcurrentDays }}
+          ,
+          "NoncurrentVersionExpiration": {
+            "NoncurrentDays": {{ . }}
+          }
+          {{- end }}
+          {{- with $lifecycle.prefix }}
+          ,
+          "Filter": {
+            "Prefix": {{ . | quote }}
+          }
+          {{- end }}
+        }
+        {{- end }}
+        {{- end }}
+      ]
+    }
+  {{- end }}
+  {{- if and $bucket.cors (not (empty $bucket.cors)) }}
+  cors-{{ $bucket.name }}.xml: |
+    {{ $bucket.cors | indent 4 }}
+  {{- end }}
+  {{- end }}
+  {{- range $policy := .Values.provisioning.userPolicies }}
+  {{- if and $policy.name $policy.statements }}
+  user-policy-{{ $policy.name }}.json: |
+    {
+      "Version": "2012-10-17",
+      "Statement": [
+        {{- range $idx, $stmt := $policy.statements }}
+        {{- if gt $idx 0 }},{{- end }}
+        {
+          {{- $fields := list }}
+          {{- if $stmt.effect }}
+          {{- $fields = append $fields (printf "\"Effect\": %s" ($stmt.effect | quote)) }}
+          {{- end }}
+          {{- if $stmt.actions }}
+          {{- $fields = append $fields (printf "\"Action\": %s" (toPrettyJson $stmt.actions)) }}
+          {{- end }}
+          {{- if $stmt.resources }}
+          {{- $fields = append $fields (printf "\"Resource\": %s" (toPrettyJson $stmt.resources)) }}
+          {{- end }}
+          {{ join ",\n          " $fields | nindent 10 }}
+        }
+        {{- end }}
+      ]
+    }
+  {{- end }}
+  {{- end }}
+  {{- range $bucketPolicy := .Values.provisioning.bucketAnonymousPolicies }}
+  {{- if and $bucketPolicy.name $bucketPolicy.statements }}
+  bucket-anonymous-policy-{{ $bucketPolicy.name }}.json: |
+    {
+      "Version": "2012-10-17",
+      "Statement": [
+        {{- range $idx, $stmt := $bucketPolicy.statements }}
+        {{- if gt $idx 0 }},{{- end }}
+        {
+          {{- $fields := list }}
+          {{- if $stmt.effect }}
+          {{- $fields = append $fields (printf "\"Effect\": %s" ($stmt.effect | quote)) }}
+          {{- end }}
+          {{- if $stmt.actions }}
+          {{- $fields = append $fields (printf "\"Action\": %s" (toPrettyJson $stmt.actions)) }}
+          {{- end }}
+          {{- if $stmt.resources }}
+          {{- $fields = append $fields (printf "\"Resource\": %s" (toPrettyJson $stmt.resources)) }}
+          {{- end }}
+          {{- if $stmt.principals }}
+          {{- $fields = append $fields (printf "\"Principal\": %s" (toPrettyJson $stmt.principals)) }}
+          {{- end }}
+          {{ join ",\n          " $fields | nindent 10 }}
+        }
+        {{- end }}
+      ]
+    }
+  {{- end }}
+  {{- end }}
+{{- end }}

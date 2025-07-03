@@ -1,0 +1,22 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "iframebreaker.fullname" . }}
+  labels:
+    {{- include "iframebreaker.labels" . | nindent 4 }}
+data:
+  # MINIO_ENDPOINT: {{ printf "%s-%s.%s:9000" .Release.Name .Values.global.minio.nameOverride .Release.Namespace | quote }}
+  MINIO_ENDPOINT: {{ .Values.minio.endpoint | quote }}
+  MINIO_RAW_BUCKET: {{ .Values.minio.rawBucket | quote }}
+  MINIO_SECURE: {{ .Values.minio.secure | quote }}
+  RABBITMQ_HOST: {{ printf "%s-%s.%s" .Release.Name .Values.global.rabbitmq.nameOverride .Release.Namespace | quote }}
+  RABBITMQ_PORT: {{ .Values.rabbitmq.port | quote }}
+  RABBITMQ_VHOST: {{ .Values.rabbitmq.vhost | quote }}
+  RABBITMQ_PUBLISH_EXCHANGE: {{ .Values.rabbitmq.exchange | quote }} 
+  RABBITMQ_PUBLISH_ROUTING_KEY: {{ .Values.rabbitmq.routingKey | quote }} 
+  RABBITMQ_CONSUME_QUEUE: {{ .Values.rabbitmq.queue | quote }} 
+  PRESIGNED_URL_EXPIRY_HOURS: {{ .Values.config.presignedUrlExpiryHours | quote }}
+  MIN_PERIOD_SECONDS: {{ .Values.config.minPeriodSeconds | quote }}
+  MAX_PERIOD_SECONDS: {{ .Values.config.maxPeriodSeconds | quote }}
+  MESSAGE_SPAN_SECONDS: {{ .Values.config.messagespanSeconds | quote }}
+  HEALTH_CHECK_PORT: {{ .Values.config.healthCheckPort | quote }}

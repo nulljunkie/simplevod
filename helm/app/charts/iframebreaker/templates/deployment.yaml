@@ -1,0 +1,201 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "iframebreaker.fullname" . }}
+  labels:
+    {{- include "iframebreaker.labels" . | nindent 4 }}
+spec:
+  {{- if not .Values.autoscaling.enabled }}
+  replicas: {{ .Values.replicaCount }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "iframebreaker.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        {{- include "iframebreaker.labels" . | nindent 8 }}
+        {{- with .Values.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "iframebreaker.serviceAccountName" . }}
+      {{- with .Values.podSecurityContext }}
+      securityContext:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: {{ .Chart.Name }}
+          {{- with .Values.securityContext }}
+          securityContext:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          {{- if .Values.command }}
+          command:
+            {{- range .Values.command }}
+            - {{ . | quote }}
+            {{- end }}
+          {{- end }}
+          {{- if .Values.args }}
+          args:
+            {{- range .Values.args }}
+            - {{ . | quote }}
+            {{- end }}
+          {{- end }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.config.healthCheckPort }}
+              protocol: TCP
+          env: 
+            - name: MINIO_ENDPOINT
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ include "iframebreaker.fullname" . }}
+                  key: MINIO_ENDPOINT
+            - name: MINIO_RAW_BUCKET
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ include "iframebreaker.fullname" . }}
+                  key: MINIO_RAW_BUCKET
+            - name: MINIO_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "iframebreaker.fullname" . }}
+                  key: minio_access_key
+            - name: MINIO_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "iframebreaker.fullname" . }}
+                  key: minio_secret_key
+            - name: MINIO_SECURE
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ include "iframebreaker.fullname" . }}
+                  key: MINIO_SECURE
+            - name: RABBITMQ_HOST
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ include "iframebreaker.fullname" . }}
+                  key: RABBITMQ_HOST
+            - name: RABBITMQ_PORT
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ include "iframebreaker.fullname" . }}
+                  key: RABBITMQ_PORT
+            - name: RABBITMQ_VHOST
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ include "iframebreaker.fullname" . }}
+                  key: RABBITMQ_VHOST
+            - name: RABBITMQ_USER
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "iframebreaker.fullname" . }}
+                  key: rabbitmq_user
+            - name: RABBITMQ_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "iframebreaker.fullname" . }}
+                  key: rabbitmq_password
+            - name: RABBITMQ_PUBLISH_EXCHANGE
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ include "iframebreaker.fullname" . }}
+                  key: RABBITMQ_PUBLISH_EXCHANGE
+            - name: RABBITMQ_PUBLISH_ROUTING_KEY
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ include "iframebreaker.fullname" . }}
+                  key: RABBITMQ_PUBLISH_ROUTING_KEY
+            - name: RABBITMQ_CONSUME_QUEUE
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ include "iframebreaker.fullname" . }}
+                  key: RABBITMQ_CONSUME_QUEUE
+            - name: PRESIGNED_URL_EXPIRY_HOURS
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ include "iframebreaker.fullname" . }}
+                  key: PRESIGNED_URL_EXPIRY_HOURS
+            - name: LOG_LEVEL
+              value: {{ .Values.config.logLevel | quote }}
+            - name: LOG_FORMAT
+              value: {{ .Values.config.logFormat | quote }}
+            - name: MIN_PERIOD_SECONDS
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ include "iframebreaker.fullname" . }}
+                  key: MIN_PERIOD_SECONDS
+            - name: MAX_PERIOD_SECONDS
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ include "iframebreaker.fullname" . }}
+                  key: MAX_PERIOD_SECONDS
+            - name: MESSAGE_SPAN_SECONDS
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ include "iframebreaker.fullname" . }}
+                  key: MESSAGE_SPAN_SECONDS
+            - name: HEALTH_CHECK_PORT
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ include "iframebreaker.fullname" . }}
+                  key: HEALTH_CHECK_PORT
+            - name: WORKER_THREADS
+              value: {{ .Values.config.workerThreads | quote }}
+            - name: GRACEFUL_SHUTDOWN_TIMEOUT
+              value: {{ .Values.config.gracefulShutdownTimeout | quote }}
+            - name: RABBITMQ_MAX_RETRIES
+              value: {{ .Values.retry.maxRetries | quote }}
+            - name: RABBITMQ_RETRY_DELAY
+              value: {{ .Values.retry.retryDelay | quote }}
+            - name: RABBITMQ_HEARTBEAT
+              value: {{ .Values.retry.heartbeat | quote }}
+            - name: RABBITMQ_CONNECTION_ATTEMPTS
+              value: {{ .Values.retry.connectionAttempts | quote }}
+            - name: CIRCUIT_BREAKER_FAILURE_THRESHOLD
+              value: {{ .Values.circuitBreaker.failureThreshold | quote }}
+            - name: CIRCUIT_BREAKER_TIMEOUT
+              value: {{ .Values.circuitBreaker.timeout | quote }}
+          {{- with .Values.livenessProbe }}
+          livenessProbe:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.readinessProbe }}
+          readinessProbe:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.volumeMounts }}
+          volumeMounts:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+      {{- with .Values.volumes }}
+      volumes:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

@@ -1,0 +1,28 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "transcoder.fullname" . }}
+  labels:
+    {{- include "transcoder.labels" . | nindent 4 }}
+data:
+  minio_endpoint: {{ printf "%s-%s.%s:9000" .Release.Name .Values.global.minio.nameOverride .Release.Namespace | quote }}
+  minio_use_ssl: {{ .Values.minio.use_ssl | quote }}
+  minio_output_bucket: {{ .Values.minio.bucket | quote }}
+  mc_alias: {{ .Values.minio.mcAlias | quote }}
+  rabbitmq_host: {{ printf "%s-%s.%s" .Release.Name .Values.global.rabbitmq.nameOverride .Release.Namespace | quote }}
+  rabbitmq_port: {{ .Values.rabbitmq.port | quote }}
+  rabbitmq_vhost: {{ .Values.rabbitmq.vhost | quote }}
+  rabbitmq_consume_queue: {{ .Values.rabbitmq.queue | quote }} 
+  rabbitmq_prefetch: {{ .Values.rabbitmq.prefetch | quote }}
+  redis_host: {{ printf "%s-%s-master.%s" .Release.Name .Values.global.redis_transcode.nameOverride .Release.Namespace | quote }}
+  redis_port: {{ .Values.redis.port | quote }}
+  redis_db: {{ .Values.redis.db | quote }} 
+  kubernetes_namespace: {{ .Release.Namespace | quote }}
+  mc_secret_name: {{ printf "%s-mc" ( include "transcoder.fullname" . ) | quote }}
+  transcode_image: {{ .Values.transcode.image | quote }} 
+  transcode_preset: {{ .Values.transcode.preset | quote }} 
+  resolutions: {{ .Values.transcode.resolutions | quote }}
+  crf_map: {{ .Values.transcode.crfMap | quote }}
+  master_playlist: {{ .Values.transcode.masterPlaylist | quote }}
+  max_concurrent_handlers: {{ .Values.config.maxConcurrentHandlers | quote }}
+  retry_interval: {{ .Values.config.retryInterval | quote }}

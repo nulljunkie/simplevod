@@ -1,0 +1,614 @@
+{{- /*
+Copyright Broadcom, Inc. All Rights Reserved.
+SPDX-License-Identifier: APACHE-2.0
+*/}}
+
+{{- if .Values.provisioning.enabled }}
+{{- $fullname := printf "%s-provisioning" (include "common.names.fullname" .) }}
+{{- $minioAlias := "provisioning" }}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ $fullname }}
+  namespace: {{ include "common.names.namespace" . | quote }}
+  labels:
+    {{- include "common.labels.standard" (dict "customLabels" .Values.commonLabels "context" .) | nindent 4 }}
+    app.kubernetes.io/component: minio-provisioning
+  annotations:
+    helm.sh/hook: post-install,post-upgrade
+    helm.sh/hook-delete-policy: before-hook-creation
+    {{- if .Values.commonAnnotations }}
+    {{- include "common.tplvalues.render" (dict "value" .Values.commonAnnotations "context" .) | nindent 4 }}
+    {{- end }}
+spec:
+  {{- if .Values.provisioning.cleanupAfterFinished.enabled }}
+  ttlSecondsAfterFinished: {{ .Values.provisioning.cleanupAfterFinished.seconds }}
+  {{- end }}
+  parallelism: 1
+  template:
+    metadata:
+      labels:
+        {{- include "minio.labels.provisioning" . | nindent 8 }}
+        app.kubernetes.io/component: minio-provisioning
+      {{- if .Values.provisioning.podAnnotations }}
+      annotations:
+        {{- include "common.tplvalues.render" (dict "value" .Values.provisioning.podAnnotations "context" .) | nindent 8 }}
+      {{- end }}
+    spec:
+      {{- include "minio.imagePullSecrets" . | nindent 6 }}
+      {{- if .Values.provisioning.schedulerName }}
+      schedulerName: {{ .Values.provisioning.schedulerName }}
+      {{- end }}
+      restartPolicy: OnFailure
+      terminationGracePeriodSeconds: 0
+      {{- if .Values.provisioning.podSecurityContext.enabled }}
+      securityContext:
+        {{- include "common.compatibility.renderSecurityContext" (dict "secContext" .Values.provisioning.podSecurityContext "context" .) | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "minio.serviceAccountName" . }}
+      initContainers:
+        - name: wait-for-available-minio
+          image: {{ include "minio.volumePermissions.image" . }}
+          imagePullPolicy: {{ .Values.image.pullPolicy | quote }}
+          {{- if .Values.provisioning.containerSecurityContext.enabled }}
+          securityContext:
+            {{- include "common.compatibility.renderSecurityContext" (dict "secContext" .Values.provisioning.containerSecurityContext "context" .) | nindent 12 }}
+          {{- end }}
+          command:
+            - /bin/bash
+            - -c
+            - |-
+              set -e
+              echo "Waiting for Minio"
+              wait-for-port \
+                --host={{ include "common.names.fullname" . }} \
+                --state=inuse \
+                --timeout=120 \
+                {{ .Values.service.ports.api | int64 }}
+              echo "Minio is available"
+          {{- if .Values.provisioning.resources }}
+          resources: {{- toYaml .Values.provisioning.resources | nindent 12 }}
+          {{- else if ne .Values.provisioning.resourcesPreset "none" }}
+          resources: {{- include "common.resources.preset" (dict "type" .Values.provisioning.resourcesPreset) | nindent 12 }}
+          {{- end }}
+      containers:
+        - name: minio
+          image: {{ include "minio.image" . }}
+          imagePullPolicy: {{ .Values.image.pullPolicy | quote }}
+          {{- if .Values.provisioning.containerSecurityContext.enabled }}
+          securityContext:
+            {{- include "common.compatibility.renderSecurityContext" (dict "secContext" .Values.provisioning.containerSecurityContext "context" .) | nindent 12 }}
+          {{- end }}
+          command:
+            {{- if .Values.provisioning.command }}
+            {{- include "common.tplvalues.render" (dict "value" .Values.provisioning.command "context" .) | nindent 12 }}
+            {{- else }}
+            - /bin/bash
+            - -c
+            - |-
+              set -e
+              echo "Start Minio provisioning"
+
+              # Utility function to retry commands
+              retry_while() {
+                local cmd="${1:?cmd is missing}"
+                local retries="${2:-12}"
+                local sleep_time="${3:-5}"
+                local return_value=1
+                read -r -a command <<< "$cmd"
+                for ((i=1; i<=retries; i++)); do
+                  echo "Attempt $i/$retries: ${command[*]}"
+                  "${command[@]}" && return_value=0 && break
+                  echo "Command failed, retrying in $sleep_time seconds..."
+                  sleep "$sleep_time"
+                done
+                return $return_value
+              }
+
+              # Check if bucket exists
+              check_bucket_exists() {
+                local bucket_name="$1"
+                mc ls "{{ $minioAlias }}/$bucket_name" >/dev/null 2>&1
+              }
+
+              # Wait for bucket availability
+              wait_for_bucket() {
+                local bucket_name="$1"
+                local retries=10
+                for ((i=1; i<=retries; i++)); do
+                  if check_bucket_exists "$bucket_name"; then
+                    return 0
+                  fi
+                  echo "Waiting for bucket $bucket_name to be available... ($i/$retries)"
+                  sleep 2
+                done
+                return 1
+              }
+
+              # Attach policy to user or group
+              attach_policy() {
+                local type="$1"
+                local name="$2"
+                local policy="$3"
+                local tmp=$(mc admin $type info {{ $minioAlias }} "$name" | sed -n -e 's/^Policy.*: \(.*\)$/\1/p')
+                IFS=',' read -r -a current_policies <<< "$tmp"
+                if [[ ! "${current_policies[*]}" =~ "$policy" ]]; then
+                  echo "Attaching policy $policy to $type $name"
+                  mc admin policy attach {{ $minioAlias }} "$policy" --"$type"="$name"
+                else
+                  echo "Policy $policy already attached to $type $name"
+                fi
+              }
+
+              # Detach dangling policies
+              detach_dangling_policies() {
+                local type="$1"
+                local name="$2"
+                local desired_policies="$3"
+                local tmp=$(mc admin $type info {{ $minioAlias }} "$name" | sed -n -e 's/^Policy.*: \(.*\)$/\1/p')
+                IFS=',' read -r -a current_policies <<< "$tmp"
+                IFS=',' read -r -a desired_policies_array <<< "$desired_policies"
+                for current in "${current_policies[@]}"; do
+                  if [[ ! "${desired_policies_array[*]}" =~ "${current}" ]]; then
+                    echo "Detaching dangling policy $current from $type $name"
+                    mc admin policy detach {{ $minioAlias }} "$current" --"$type"="$name"
+                  fi
+                done
+              }
+
+              # Add user from file
+              add_user_from_file() {
+                local config_file="$1"
+                local username=$(grep -oP '^username=\K.+' "$config_file")
+                local password=$(grep -oP '^password=\K.+' "$config_file")
+                local disabled=$(grep -oP '^disabled=\K.+' "$config_file")
+                local policies_list=$(grep -oP '^policies=\K.+' "$config_file")
+                local set_policies=$(grep -oP '^setPolicies=\K.+' "$config_file")
+
+                if ! mc admin user list {{ $minioAlias }} | grep -q "^${username}$"; then
+                  echo "Creating user ${username}"
+                  mc admin user add {{ $minioAlias }} "${username}" "${password}"
+                else
+                  echo "User ${username} already exists, skipping creation."
+                fi
+
+                IFS=',' read -r -a policies <<< "${policies_list}"
+                for policy in "${policies[@]}"; do
+                  attach_policy user "${username}" "${policy}"
+                done
+                if [ "${set_policies}" == "true" ]; then
+                  detach_dangling_policies user "${username}" "${policies_list}"
+                fi
+
+                local user_status="enable"
+                if [[ "${disabled}" == "true" ]]; then
+                  user_status="disable"
+                fi
+                echo "Setting user ${username} status to ${user_status}"
+                mc admin user "${user_status}" {{ $minioAlias }} "${username}"
+              }
+
+              # Set MinIO alias
+              {{- $minioUrl := printf "$MINIO_SCHEME://%s:%d" (include "common.names.fullname" .) (.Values.service.ports.api | int) }}
+              {{- $minioRootUser := ternary ("$(<$MINIO_ROOT_USER_FILE)") ("$MINIO_ROOT_USER") (.Values.auth.usePasswordFiles) }}
+              {{- $minioRootPassword := ternary ("$(<$MINIO_ROOT_PASSWORD_FILE)") ("$MINIO_ROOT_PASSWORD") (.Values.auth.usePasswordFiles) }}
+              echo "Setting MinIO alias: {{ $minioAlias }}"
+              mc alias set {{ $minioAlias }} {{ $minioUrl }} {{ $minioRootUser }} {{ $minioRootPassword }}
+
+              # Apply MinIO configuration
+              {{- if .Values.provisioning.config }}
+              echo "Processing MinIO configuration..."
+              {{- range $config := .Values.provisioning.config }}
+              {{- if and $config.name $config.options }}
+              {{- $options := list }}
+              {{- range $name, $value := $config.options }}
+              {{- if not (empty $value) }}
+              {{- $options = (printf "%s=%s" $name $value) | append $options }}
+              {{- end }}
+              {{- end }}
+              {{- $options := join " " $options }}
+              {{- if $options }}
+              echo "Setting config: {{ $config.name }}"
+              mc admin config set {{ $minioAlias }} {{ $config.name | quote }} {{ $options }}
+              {{- else }}
+              echo "No valid options for config: {{ $config.name }}"
+              {{- end }}
+              {{- else }}
+              echo "Invalid config: missing name or options for {{ $config | toJson }}"
+              {{- end }}
+              {{- end }}
+              echo "Restarting MinIO service after configuration..."
+              mc admin service restart {{ $minioAlias }} --wait --json
+              {{- else }}
+              echo "No provisioning.config defined"
+              {{- end }}
+
+              # Wait for MinIO availability post-restart
+              sleep {{ .Values.provisioning.sleepTime | default 5 }}
+              echo "Waiting for Minio to be available after restart"
+              if ! retry_while "mc admin info {{ $minioAlias }}"; then
+                echo "Error connecting to Minio"
+                exit 1
+              fi
+              echo "Minio is available. Executing provisioning commands"
+
+              # Create or update policies
+              {{- if .Values.provisioning.policies }}
+              echo "Processing policies..."
+              {{- range $policy := .Values.provisioning.policies }}
+              echo "Creating policy {{ $policy.name }}"
+              if ! mc admin policy list {{ $minioAlias }} | grep -q "^{{ $policy.name }}$"; then
+                mc admin policy create {{ $minioAlias }} {{ $policy.name }} /etc/ilm/policy-{{ $policy.name }}.json
+              else
+                echo "Policy {{ $policy.name }} already exists. Updating by removing and recreating..."
+                echo "Detaching policy {{ $policy.name }} from all users before removal..."
+                mc admin user list {{ $minioAlias }} --json | jq -r '.[] | select(.policyName != null and (.policyName | contains("{{ $policy.name }}"))) | .accessKey' 2>/dev/null | while read user; do
+                  if [ ! -z "$user" ]; then
+                    echo "Detaching policy {{ $policy.name }} from user $user"
+                    mc admin policy detach {{ $minioAlias }} {{ $policy.name }} --user="$user" || echo "Warning: Failed to detach policy from user $user"
+                  fi
+                done
+                echo "Removing policy {{ $policy.name }}..."
+                mc admin policy remove {{ $minioAlias }} {{ $policy.name }} || echo "Warning: Failed to remove policy {{ $policy.name }}"
+                mc admin policy create {{ $minioAlias }} {{ $policy.name }} /etc/ilm/policy-{{ $policy.name }}.json
+              fi
+              {{- end }}
+              {{- else }}
+              echo "No policies defined in provisioning.policies"
+              {{- end }}
+
+              # Create or update user policies
+              {{- if .Values.provisioning.userPolicies }}
+              echo "Processing user policies..."
+              {{- range $policy := .Values.provisioning.userPolicies }}
+              echo "Creating user policy {{ $policy.name }}"
+              if ! mc admin policy list {{ $minioAlias }} | grep -q "^{{ $policy.name }}$"; then
+                mc admin policy create {{ $minioAlias }} {{ $policy.name }} /etc/ilm/user-policy-{{ $policy.name }}.json
+              else
+                echo "User policy {{ $policy.name }} already exists. Updating by removing and recreating..."
+                echo "Detaching policy {{ $policy.name }} from all users before removal..."
+                mc admin user list {{ $minioAlias }} --json | jq -r '.[] | select(.policyName != null and (.policyName | contains("{{ $policy.name }}"))) | .accessKey' 2>/dev/null | while read user; do
+                  if [ ! -z "$user" ]; then
+                    echo "Detaching policy {{ $policy.name }} from user $user"
+                    mc admin policy detach {{ $minioAlias }} {{ $policy.name }} --user="$user" || echo "Warning: Failed to detach policy from user $user"
+                  fi
+                done
+                echo "Removing policy {{ $policy.name }}..."
+                mc admin policy remove {{ $minioAlias }} {{ $policy.name }} || echo "Warning: Failed to remove policy {{ $policy.name }}"
+                mc admin policy create {{ $minioAlias }} {{ $policy.name }} /etc/ilm/user-policy-{{ $policy.name }}.json
+              fi
+              {{- end }}
+              {{- else }}
+              echo "No user policies defined in provisioning.userPolicies"
+              {{- end }}
+
+              # Manage users
+              {{- if .Values.provisioning.users }}
+              echo "Processing users..."
+              {{- range $user := .Values.provisioning.users }}
+              if ! mc admin user list {{ $minioAlias }} | grep -q "^{{ $user.username }}$"; then
+                echo "Creating user {{ $user.username }}"
+                mc admin user add {{ $minioAlias }} {{ $user.username }} {{ $user.password }}
+              else
+                echo "User {{ $user.username }} already exists. Skipping creation."
+              fi
+              {{- range $policy := $user.policies }}
+              attach_policy user {{ $user.username }} {{ $policy }}
+              {{- end }}
+              {{- if $user.setPolicies }}
+              detach_dangling_policies user {{ $user.username }} "{{ join "," $user.policies }}"
+              {{- end }}
+              {{- $userStatus := ternary "disable" "enable" (and (not (empty $user.disabled)) $user.disabled) }}
+              echo "Setting user {{ $user.username }} status to {{ $userStatus }}"
+              mc admin user {{ $userStatus }} {{ $minioAlias }} {{ $user.username }}
+              {{- end }}
+              {{- else }}
+              echo "No users defined in provisioning.users"
+              {{- end }}
+
+              # Manage users from existing secrets
+              {{- if .Values.provisioning.usersExistingSecrets }}
+              echo "Processing users from existing secrets..."
+              while read -d '' config_file; do
+                add_user_from_file "${config_file}"
+              done < <(find "/opt/bitnami/minio/users/" -type l -not -name '..data' -print0)
+              {{- else }}
+              echo "No users defined in provisioning.usersExistingSecrets"
+              {{- end }}
+
+              # Manage groups
+              {{- if .Values.provisioning.groups }}
+              echo "Processing groups..."
+              {{- range $group := .Values.provisioning.groups }}
+              echo "Adding group {{ $group.name }}"
+              mc admin group add {{ $minioAlias }} {{ $group.name }} {{ join " " $group.members }}
+              {{- range $policy := $group.policies }}
+              attach_policy group {{ $group.name }} {{ $policy }}
+              {{- end }}
+              {{- if $group.setPolicies }}
+              detach_dangling_policies group {{ $group.name }} "{{ join "," $group.policies }}"
+              {{- end }}
+              {{- $groupStatus := ternary "disable" "enable" (and (not (empty $group.disabled)) $group.disabled) }}
+              echo "Setting group {{ $group.name }} status to {{ $groupStatus }}"
+              mc admin group {{ $groupStatus }} {{ $minioAlias }} {{ $group.name }}
+              {{- end }}
+              {{- else }}
+              echo "No groups defined in provisioning.groups"
+              {{- end }}
+
+              # Manage buckets
+              {{- if .Values.provisioning.buckets }}
+              echo "Processing buckets..."
+              {{- range $bucket := .Values.provisioning.buckets }}
+              {{- $target := printf "%s/%s" $minioAlias $bucket.name }}
+              {{- $region := ternary (printf "--region=%s" $bucket.region) "" (not (empty $bucket.region)) }}
+              {{- $withLock := ternary "--with-lock" "" (and (not (empty $bucket.withLock)) $bucket.withLock) }}
+              echo "Creating/checking bucket {{ $bucket.name }}..."
+              mc mb {{ $target }} --ignore-existing {{ $region }} {{ $withLock }} || echo "Warning: Failed to create bucket {{ $bucket.name }}"
+              wait_for_bucket "{{ $bucket.name }}" || echo "Warning: Bucket {{ $bucket.name }} not available after creation"
+
+              {{- if $bucket.lifecycle }}
+              echo "Setting lifecycle policy for bucket {{ $bucket.name }}..."
+              if check_bucket_exists "{{ $bucket.name }}"; then
+                mc ilm import {{ $minioAlias }}/{{ $bucket.name }} < /etc/ilm/bucket-{{ $bucket.name }}.json || echo "Warning: Failed to set lifecycle for bucket {{ $bucket.name }}"
+              else
+                echo "Warning: Bucket {{ $bucket.name }} not available for lifecycle configuration"
+              fi
+              {{- end }}
+
+              {{- with $bucket.quota }}
+              echo "Setting quota for bucket {{ $bucket.name }}..."
+              {{- if eq .type "hard" }}
+              mc quota set {{ $minioAlias }}/{{ $bucket.name }} {{ if .size }}--size {{ .size }}{{ end }}
+              {{- else }}
+              mc quota {{ .type }} {{ $minioAlias }}/{{ $bucket.name }} {{ if .size }}--size {{ .size }}{{ end }}
+              {{- end }}
+              {{- end }}
+
+              {{- if (or (empty $bucket.withLock) (not $bucket.withLock)) }}
+              {{- $versioning := default "Suspended" $bucket.versioning }}
+              {{- if kindIs "bool" $bucket.versioning }}
+              {{- $versioning = ternary "Versioned" "Suspended" $bucket.versioning }}
+              {{- end }}
+              {{- if eq $versioning "Versioned" }}
+              echo "Enabling versioning for bucket {{ $bucket.name }}"
+              mc version enable {{ $minioAlias }}/{{ $bucket.name }}
+              {{- else if eq $versioning "Suspended" }}
+              echo "Suspending versioning for bucket {{ $bucket.name }}"
+              mc version suspend {{ $minioAlias }}/{{ $bucket.name }}
+              {{- else if ne $versioning "Unchanged" }}
+              {{- fail (printf "Invalid value '%s' for versioning of bucket '%s'" $versioning $bucket.name) }}
+              {{- end }}
+              {{- end }}
+
+              {{- if $bucket.tags }}
+              echo "Setting tags for bucket {{ $bucket.name }}..."
+              {{- $target := printf "%s/%s" $minioAlias $bucket.name }}
+              {{- $tags := list }}
+              {{- range $name, $value := $bucket.tags }}
+              {{- $tags = (printf "%s=%s" $name $value) | append $tags }}
+              {{- end }}
+              {{- $tags = join "&" $tags | quote }}
+              mc tag set {{ $target }} {{ $tags }}
+              {{- end }}
+
+              {{- if $bucket.cors }}
+              echo "Setting CORS policy for bucket {{ $bucket.name }}..."
+              if check_bucket_exists "{{ $bucket.name }}"; then
+                mc cors set {{ $minioAlias }}/{{ $bucket.name }} /etc/ilm/cors-{{ $bucket.name }}.xml || echo "Warning: Failed to set CORS for bucket {{ $bucket.name }}"
+              else
+                echo "Warning: Bucket {{ $bucket.name }} not available for CORS configuration"
+              fi
+              {{- end }}
+
+              {{- if $bucket.eventNotifications }}
+              echo "Processing event notifications for bucket {{ $bucket.name }}..."
+              {{- range $notification := $bucket.eventNotifications }}
+              {{- $bucketName := printf "%s/%s" $minioAlias $bucket.name }}
+              {{- $arn := $notification.arn }}
+              {{- $events := join "," $notification.events }}
+              {{- $prefix := $notification.prefix | default "" }}
+              {{- $suffix := $notification.suffix | default "" }}
+              echo "Checking for existing event notification on {{ $bucketName }} for ARN {{ $arn }}..."
+              
+              # Debug: Show current event list
+              echo "Current events on {{ $bucketName }}:"
+              mc event list "{{ $bucketName }}" --json || echo "No events or error listing events"
+              
+              # Check if notification already exists with simpler logic
+              EXISTING_EVENTS=$(mc event list "{{ $bucketName }}" --json 2>/dev/null | jq -r '.[] | select(.arn == "{{ $arn }}") | .events[]' 2>/dev/null | sort | tr '\n' ',' | sed 's/,$//')
+              DESIRED_EVENTS="{{ $events }}"
+              
+              echo "Existing events for ARN {{ $arn }}: '$EXISTING_EVENTS'"
+              echo "Desired events: '$DESIRED_EVENTS'"
+              
+              if [ "$EXISTING_EVENTS" = "$DESIRED_EVENTS" ]; then
+                echo "Event notification for ARN {{ $arn }} already exists with matching events. Skipping."
+              else
+                echo "Notification not found or different. Adding/updating event notification..."
+                
+                # Remove existing notification if it exists
+                if [ ! -z "$EXISTING_EVENTS" ]; then
+                  echo "Removing existing notification for ARN {{ $arn }}"
+                  mc event remove "{{ $bucketName }}" --arn "{{ $arn }}" || echo "Warning: Failed to remove existing notification"
+                fi
+                
+                # Add new notification
+                EVENT_CMD="mc event add \"{{ $bucketName }}\" \"{{ $arn }}\" --event \"{{ $events }}\""
+                {{- if $prefix }}
+                EVENT_CMD="$EVENT_CMD --prefix \"{{ $prefix }}\""
+                {{- end }}
+                {{- if $suffix }}
+                EVENT_CMD="$EVENT_CMD --suffix \"{{ $suffix }}\""
+                {{- end }}
+                echo "Executing: $EVENT_CMD"
+                eval "$EVENT_CMD" || echo "Warning: Failed to set event notification for {{ $arn }} on {{ $bucketName }}"
+                
+                # Verify the notification was added
+                echo "Verifying notification was added:"
+                mc event list "{{ $bucketName }}" --json || echo "Error verifying notification"
+              fi
+              {{- end }}
+              {{- end }}
+              {{- end }}
+              {{- else }}
+              echo "No buckets defined in provisioning.buckets"
+              {{- end }}
+
+              # Apply bucket anonymous policies (after buckets are created)
+              {{- if .Values.provisioning.bucketAnonymousPolicies }}
+              echo "Processing bucket anonymous policies..."
+              {{- range $bucketPolicy := .Values.provisioning.bucketAnonymousPolicies }}
+              echo "Setting anonymous policy for bucket {{ $bucketPolicy.name }}"
+              if check_bucket_exists "{{ $bucketPolicy.name }}"; then
+                {{- range $stmt := $bucketPolicy.statements }}
+                {{- if and (has "s3:GetObject" $stmt.actions) (not (has "s3:PutObject" $stmt.actions)) }}
+                echo "Setting download-only anonymous access for {{ $bucketPolicy.name }}"
+                mc anonymous set download {{ $minioAlias }}/{{ $bucketPolicy.name }}
+                {{- else if and (has "s3:PutObject" $stmt.actions) (not (has "s3:GetObject" $stmt.actions)) }}
+                echo "Setting upload-only anonymous access for {{ $bucketPolicy.name }}"
+                mc anonymous set upload {{ $minioAlias }}/{{ $bucketPolicy.name }}
+                {{- else if and (has "s3:GetObject" $stmt.actions) (has "s3:PutObject" $stmt.actions) }}
+                echo "Setting public (read/write) anonymous access for {{ $bucketPolicy.name }}"
+                mc anonymous set public {{ $minioAlias }}/{{ $bucketPolicy.name }}
+                {{- else }}
+                echo "Complex anonymous policy for {{ $bucketPolicy.name }} - using policy set-json as fallback"
+                mc policy set-json /etc/ilm/bucket-anonymous-policy-{{ $bucketPolicy.name }}.json {{ $minioAlias }}/{{ $bucketPolicy.name }}
+                {{- end }}
+                {{- end }}
+              else
+                echo "Warning: Bucket {{ $bucketPolicy.name }} does not exist. Skipping anonymous policy."
+              fi
+              {{- end }}
+              {{- else }}
+              echo "No bucket anonymous policies defined in provisioning.bucketAnonymousPolicies"
+              {{- end }}
+
+              {{- if .Values.provisioning.extraCommands }}
+              echo "Executing extra commands..."
+              {{- join ";" .Values.provisioning.extraCommands | nindent 14 }}
+              {{- end }}
+
+              echo "End Minio provisioning"
+            {{- end }}
+          {{- if .Values.provisioning.args }}
+          args:
+            {{- include "common.tplvalues.render" (dict "value" .Values.provisioning.args "context" .) | nindent 12 }}
+          {{- end }}
+          env:
+            - name: MINIO_SCHEME
+              value: {{ ternary "https" "http" .Values.tls.enabled | quote }}
+            {{- if .Values.auth.usePasswordFiles }}
+            - name: MINIO_ROOT_USER_FILE
+              value: {{ printf "/opt/bitnami/minio/secrets/%s" (include "minio.rootUserKey" .) }}
+            - name: MINIO_ROOT_PASSWORD_FILE
+              value: {{ printf "/opt/bitnami/minio/secrets/%s" (include "minio.rootPasswordKey" .) }}
+            {{- else }}
+            - name: MINIO_ROOT_USER
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "minio.secretName" . }}
+                  key: {{ include "minio.rootUserKey" . }}
+            - name: MINIO_ROOT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "minio.secretName" . }}
+                  key: {{ include "minio.rootPasswordKey" . }}
+            {{- end }}
+            {{- if .Values.tls.mountPath }}
+            - name: MINIO_CERTS_DIR
+              value: {{ .Values.tls.mountPath | quote }}
+            {{- end }}
+          envFrom:
+            {{- if .Values.extraEnvVarsCM }}
+            - configMapRef:
+                name: {{ include "common.tplvalues.render" (dict "value" .Values.extraEnvVarsCM "context" .) }}
+            {{- end }}
+            {{- if .Values.extraEnvVarsSecret }}
+            - secretRef:
+                name: {{ include "common.tplvalues.render" (dict "value" .Values.extraEnvVarsSecret "context" .) }}
+            {{- end }}
+          {{- if .Values.provisioning.resources }}
+          resources: {{- toYaml .Values.provisioning.resources | nindent 12 }}
+          {{- else if ne .Values.provisioning.resourcesPreset "none" }}
+          resources: {{- include "common.resources.preset" (dict "type" .Values.provisioning.resourcesPreset) | nindent 12 }}
+          {{- end }}
+          volumeMounts:
+            - name: empty-dir
+              mountPath: /.mc
+              subPath: app-mc-dir
+            - name: empty-dir
+              mountPath: /opt/bitnami/minio/tmp
+              subPath: app-tmp-dir
+            - name: empty-dir
+              mountPath: /tmp
+              subPath: tmp-dir
+            {{- if .Values.provisioning.enabled }}
+            - name: minio-provisioning
+              mountPath: /etc/ilm
+            {{- end }}
+            {{- if .Values.auth.usePasswordFiles }}
+            - name: minio-credentials
+              mountPath: /opt/bitnami/minio/secrets/
+            {{- end }}
+            {{- if .Values.tls.enabled }}
+            - name: minio-certs
+              mountPath: {{ default "/certs" .Values.tls.mountPath }}
+            - name: minio-client-certs
+              mountPath: /.mc/certs
+            {{- end }}
+            {{- range $idx, $_ := .Values.provisioning.usersExistingSecrets }}
+            - name: {{ printf "users-secret-%d" $idx }}
+              mountPath: /opt/bitnami/minio/users/{{ $idx }}/
+            {{- end }}
+            {{- if .Values.provisioning.extraVolumeMounts }}
+            {{- include "common.tplvalues.render" (dict "value" .Values.provisioning.extraVolumeMounts "context" .) | nindent 12 }}
+            {{- end }}
+      {{- if .Values.tolerations }}
+      tolerations:
+        {{- include "common.tplvalues.render" (dict "value" .Values.tolerations "context" .) | nindent 8 }}
+      {{- end }}
+      {{- if .Values.provisioning.nodeSelector }}
+      nodeSelector:
+        {{- include "common.tplvalues.render" (dict "value" .Values.provisioning.nodeSelector "context" .) | nindent 8 }}
+      {{- end }}
+      volumes:
+        - name: empty-dir
+          emptyDir: {}
+        {{- if .Values.provisioning.enabled }}
+        - name: minio-provisioning
+          configMap:
+            name: {{ $fullname }}
+        {{- end }}
+        {{- if .Values.auth.usePasswordFiles }}
+        - name: minio-credentials
+          secret:
+            secretName: {{ include "minio.secretName" . }}
+        {{- end }}
+        {{- range $idx, $userSecret := .Values.provisioning.usersExistingSecrets }}
+        - name: {{ printf "users-secret-%d" $idx }}
+          secret:
+            secretName: {{ $userSecret }}
+        {{- end }}
+        {{- if .Values.tls.enabled }}
+        - name: minio-certs
+          secret:
+            secretName: {{ include "minio.tlsSecretName" . }}
+            items:
+              - key: tls.crt
+                path: public.crt
+              - key: tls.key
+                path: private.key
+              - key: ca.crt
+                path: CAs/public.crt
+        - name: minio-client-certs
+          secret:
+            secretName: {{ include "minio.tlsSecretName" . }}
+            items:
+              - key: ca.crt
+                path: CAs/public.crt
+        {{- end }}
+        {{- if .Values.provisioning.extraVolumes }}
+        {{- include "common.tplvalues.render" (dict "value" .Values.provisioning.extraVolumes "context" .) | nindent 8 }}
+        {{- end }}
+{{- end }}

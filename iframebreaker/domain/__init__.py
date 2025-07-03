@@ -1,0 +1,1 @@
+# Domain layer - contains business logic interfaces and models

@@ -1,0 +1,971 @@
+---
+# Source: minio/templates/networkpolicy.yaml
+kind: NetworkPolicy
+apiVersion: networking.k8s.io/v1
+metadata:
+  name: minio
+  namespace: "default"
+  labels:
+    app.kubernetes.io/instance: minio
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/name: minio
+    app.kubernetes.io/version: 2025.4.8
+    helm.sh/chart: minio-16.0.7
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/instance: minio
+      app.kubernetes.io/name: minio
+  policyTypes:
+    - Ingress
+    - Egress
+  egress:
+    - {}
+  ingress:
+    # Allow inbound connections
+    - ports:
+        - port: 9001
+        - port: 9000
+---
+# Source: minio/templates/provisioning-networkpolicy.yaml
+kind: NetworkPolicy
+apiVersion: networking.k8s.io/v1
+metadata:
+  name: minio-provisioning
+  namespace: "default"
+  labels:
+    app.kubernetes.io/instance: minio
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/name: minio
+    app.kubernetes.io/version: 2025.4.8
+    helm.sh/chart: minio-16.0.7
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/component: minio-provisioning
+  policyTypes:
+    - Ingress
+    - Egress
+  egress:
+    - {}
+  ingress:
+---
+# Source: minio/templates/pdb.yaml
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: minio
+  namespace: "default"
+  labels:
+    app.kubernetes.io/instance: minio
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/name: minio
+    app.kubernetes.io/version: 2025.4.8
+    helm.sh/chart: minio-16.0.7
+spec:
+  maxUnavailable: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/instance: minio
+      app.kubernetes.io/name: minio
+---
+# Source: minio/templates/serviceaccount.yaml
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: minio
+  namespace: "default"
+  labels:
+    app.kubernetes.io/instance: minio
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/name: minio
+    app.kubernetes.io/version: 2025.4.8
+    helm.sh/chart: minio-16.0.7
+automountServiceAccountToken: false
+secrets:
+  - name: minio
+---
+# Source: minio/templates/secrets.yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: minio
+  namespace: "default"
+  labels:
+    app.kubernetes.io/instance: minio
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/name: minio
+    app.kubernetes.io/version: 2025.4.8
+    helm.sh/chart: minio-16.0.7
+type: Opaque
+data:
+  root-user: "YWRtaW4="
+  root-password: "YWRtaW4xMjM="
+---
+# Source: minio/templates/provisioning-configmap.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: minio-provisioning
+  namespace: "default"
+  labels:
+    app.kubernetes.io/instance: minio
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/name: minio
+    app.kubernetes.io/version: 2025.4.8
+    helm.sh/chart: minio-16.0.7
+    app.kubernetes.io/component: minio-provisioning
+data:
+  bucket-raw.json: |
+    {
+      "Rules": [
+        {
+          "ID": "TestPrefix7dRetention",
+          "Status": "Enabled"
+          ,
+          "Expiration": {
+            "Days": 7
+          }
+          ,
+          "NoncurrentVersionExpiration": {
+            "NoncurrentDays": 3
+          }
+          ,
+          "Filter": {
+            "Prefix": "test-prefix"
+          }
+        }
+      ]
+    }
+  user-policy-uploader.json: |
+    {
+      "Version": "2012-10-17",
+      "Statement": [
+        {
+          
+          "Effect": "Allow",
+                    "Action": [
+            "s3:GetBucketLocation",
+            "s3:ListBucket",
+            "s3:ListBucketMultipartUploads"
+          ],
+                    "Resource": [
+            "arn:aws:s3:::raw/"
+          ]
+        },
+        {
+          
+          "Effect": "Allow",
+                    "Action": [
+            "s3:AbortMultipartUpload",
+            "s3:DeleteObject",
+            "s3:GetObject",
+            "s3:ListMultipartUploadParts",
+            "s3:PutObject"
+          ],
+                    "Resource": [
+            "arn:aws:s3:::raw/*"
+          ]
+        },
+        {
+          
+          "Effect": "Allow",
+                    "Action": [
+            "s3:GetBucketLocation",
+            "s3:ListBucket"
+          ],
+                    "Resource": [
+            "arn:aws:s3:::thumbnail/"
+          ]
+        },
+        {
+          
+          "Effect": "Allow",
+                    "Action": [
+            "s3:DeleteObject",
+            "s3:GetObject",
+            "s3:PutObject"
+          ],
+                    "Resource": [
+            "arn:aws:s3:::thumbnail/*"
+          ]
+        }
+      ]
+    }
+  user-policy-prober.json: |
+    {
+      "Version": "2012-10-17",
+      "Statement": [
+        {
+          
+          "Effect": "Allow",
+                    "Action": [
+            "s3:GetBucketLocation",
+            "s3:ListBucket"
+          ],
+                    "Resource": [
+            "arn:aws:s3:::raw/"
+          ]
+        },
+        {
+          
+          "Effect": "Allow",
+                    "Action": [
+            "s3:GetObject"
+          ],
+                    "Resource": [
+            "arn:aws:s3:::raw/*"
+          ]
+        }
+      ]
+    }
+  user-policy-transcoder.json: |
+    {
+      "Version": "2012-10-17",
+      "Statement": [
+        {
+          
+          "Effect": "Allow",
+                    "Action": [
+            "s3:GetBucketLocation",
+            "s3:ListBucket"
+          ],
+                    "Resource": [
+            "arn:aws:s3:::stream/"
+          ]
+        },
+        {
+          
+          "Effect": "Allow",
+                    "Action": [
+            "s3:GetObject",
+            "s3:PutObject"
+          ],
+                    "Resource": [
+            "arn:aws:s3:::stream/*"
+          ]
+        }
+      ]
+    }
+  bucket-anonymous-policy-stream.json: |
+    {
+      "Version": "2012-10-17",
+      "Statement": [
+        {
+          
+          "Effect": "Allow",
+                    "Action": [
+            "s3:GetObject"
+          ],
+                    "Resource": [
+            "arn:aws:s3:::stream/*"
+          ],
+                    "Principal": [
+            "*"
+          ]
+        }
+      ]
+    }
+  bucket-anonymous-policy-thumbnail.json: |
+    {
+      "Version": "2012-10-17",
+      "Statement": [
+        {
+          
+          "Effect": "Allow",
+                    "Action": [
+            "s3:GetObject"
+          ],
+                    "Resource": [
+            "arn:aws:s3:::thumbnail/*"
+          ],
+                    "Principal": [
+            "*"
+          ]
+        }
+      ]
+    }
+---
+# Source: minio/templates/pvc.yaml
+kind: PersistentVolumeClaim
+apiVersion: v1
+metadata:
+  name: minio
+  namespace: "default"
+  labels:
+    app.kubernetes.io/instance: minio
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/name: minio
+    app.kubernetes.io/version: 2025.4.8
+    helm.sh/chart: minio-16.0.7
+spec:
+  accessModes:
+    - "ReadWriteOnce"
+  resources:
+    requests:
+      storage: "2Gi"
+---
+# Source: minio/templates/service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: minio
+  namespace: "default"
+  labels:
+    app.kubernetes.io/instance: minio
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/name: minio
+    app.kubernetes.io/version: 2025.4.8
+    helm.sh/chart: minio-16.0.7
+spec:
+  type: ClusterIP
+  ports:
+    - name: minio-api
+      port: 80
+      targetPort: minio-api
+      nodePort: null
+    - name: minio-console
+      port: 9001
+      targetPort: minio-console
+      nodePort: null
+  selector:
+    app.kubernetes.io/instance: minio
+    app.kubernetes.io/name: minio
+---
+# Source: minio/templates/standalone/deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: minio
+  namespace: "default"
+  labels:
+    app.kubernetes.io/instance: minio
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/name: minio
+    app.kubernetes.io/version: 2025.4.8
+    helm.sh/chart: minio-16.0.7
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/instance: minio
+      app.kubernetes.io/name: minio
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/instance: minio
+        app.kubernetes.io/managed-by: Helm
+        app.kubernetes.io/name: minio
+        app.kubernetes.io/version: 2025.4.8
+        helm.sh/chart: minio-16.0.7
+      annotations:
+        checksum/credentials-secret: 6583b8cfe855ab291a44dbabf1c9132f07e595c3608533673751f73f5d0541c5
+    spec:
+      
+      serviceAccountName: minio
+      affinity:
+        podAffinity:
+          
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - podAffinityTerm:
+                labelSelector:
+                  matchLabels:
+                    app.kubernetes.io/instance: minio
+                    app.kubernetes.io/name: minio
+                topologyKey: kubernetes.io/hostname
+              weight: 1
+        nodeAffinity:
+          
+      automountServiceAccountToken: false
+      securityContext:
+        fsGroup: 1001
+        fsGroupChangePolicy: OnRootMismatch
+        supplementalGroups: []
+        sysctls: []
+      containers:
+        - name: minio
+          image: docker.io/bitnami/minio:2025.4.8-debian-12-r2
+          imagePullPolicy: "IfNotPresent"
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+              - ALL
+            privileged: false
+            readOnlyRootFilesystem: true
+            runAsGroup: 1001
+            runAsNonRoot: true
+            runAsUser: 1001
+            seLinuxOptions: {}
+            seccompProfile:
+              type: RuntimeDefault
+          env:
+            - name: BITNAMI_DEBUG
+              value: "false"
+            - name: MINIO_SCHEME
+              value: "http"
+            - name: MINIO_FORCE_NEW_KEYS
+              value: "no"
+            - name: MINIO_API_PORT_NUMBER
+              value: "9000"
+            - name: MINIO_ROOT_USER_FILE
+              value: /opt/bitnami/minio/secrets/root-user
+            - name: MINIO_ROOT_PASSWORD_FILE
+              value: /opt/bitnami/minio/secrets/root-password
+            - name: MINIO_BROWSER
+              value: "on"
+            - name: MINIO_PROMETHEUS_AUTH_TYPE
+              value: "public"
+            - name: MINIO_CONSOLE_PORT_NUMBER
+              value: "9001"
+            - name: MINIO_DATA_DIR
+              value: "/bitnami/minio/data"
+          envFrom:
+          ports:
+            - name: minio-api
+              containerPort: 9000
+              protocol: TCP
+            - name: minio-console
+              containerPort: 9001
+              protocol: TCP
+          livenessProbe:
+            httpGet:
+              path: /minio/health/live
+              port: minio-api
+              scheme: "HTTP"
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            timeoutSeconds: 5
+            successThreshold: 1
+            failureThreshold: 5
+          readinessProbe:
+            tcpSocket:
+              port: minio-api
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            timeoutSeconds: 1
+            successThreshold: 1
+            failureThreshold: 5
+          resources:
+            limits:
+              cpu: 375m
+              ephemeral-storage: 2Gi
+              memory: 384Mi
+            requests:
+              cpu: 250m
+              ephemeral-storage: 50Mi
+              memory: 256Mi
+          volumeMounts:
+            - name: empty-dir
+              mountPath: /tmp
+              subPath: tmp-dir
+            - name: empty-dir
+              mountPath: /opt/bitnami/minio/tmp
+              subPath: app-tmp-dir
+            - name: empty-dir
+              mountPath: /.mc
+              subPath: app-mc-dir
+            - name: minio-credentials
+              mountPath: /opt/bitnami/minio/secrets/
+            - name: data
+              mountPath: /bitnami/minio/data
+      volumes:
+        - name: empty-dir
+          emptyDir: {}
+        - name: minio-credentials
+          secret:
+            secretName: minio
+        - name: data
+          persistentVolumeClaim:
+            claimName: minio
+---
+# Source: minio/templates/api-ingress.yaml
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: minio-api
+  namespace: "default"
+  labels:
+    app.kubernetes.io/instance: minio
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/name: minio
+    app.kubernetes.io/version: 2025.4.8
+    helm.sh/chart: minio-16.0.7
+  annotations:
+    nginx.ingress.kubernetes.io/backend-protocol: HTTP
+    nginx.ingress.kubernetes.io/client-body-buffer-size: 1m
+    nginx.ingress.kubernetes.io/proxy-body-size: "0"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "600"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "600"
+    nginx.ingress.kubernetes.io/ssl-redirect: "false"
+spec:
+  rules:
+    - host: api.minio.simplevod.app
+      http:
+        paths:
+          - path: /
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: minio
+                port:
+                  name: minio-api
+---
+# Source: minio/templates/ingress.yaml
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: minio
+  namespace: "default"
+  labels:
+    app.kubernetes.io/instance: minio
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/name: minio
+    app.kubernetes.io/version: 2025.4.8
+    helm.sh/chart: minio-16.0.7
+  annotations:
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+spec:
+  rules:
+    - host: console.minio.simplevod.app
+      http:
+        paths:
+          - path: /
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: minio
+                port:
+                  name: minio-console
+---
+# Source: minio/templates/provisioning-job.yaml
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: minio-provisioning
+  namespace: "default"
+  labels:
+    app.kubernetes.io/instance: minio
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/name: minio
+    app.kubernetes.io/version: 2025.4.8
+    helm.sh/chart: minio-16.0.7
+    app.kubernetes.io/component: minio-provisioning
+  annotations:
+    helm.sh/hook: post-install,post-upgrade
+    helm.sh/hook-delete-policy: before-hook-creation
+spec:
+  parallelism: 1
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/managed-by: Helm
+        app.kubernetes.io/version: 2025.4.8
+        helm.sh/chart: minio-16.0.7
+        app.kubernetes.io/component: minio-provisioning
+    spec:
+      
+      restartPolicy: OnFailure
+      terminationGracePeriodSeconds: 0
+      securityContext:
+        fsGroup: 1001
+        fsGroupChangePolicy: Always
+        supplementalGroups: []
+        sysctls: []
+      serviceAccountName: minio
+      initContainers:
+        - name: wait-for-available-minio
+          image: docker.io/bitnami/os-shell:12-debian-12-r42
+          imagePullPolicy: "IfNotPresent"
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+              - ALL
+            privileged: false
+            readOnlyRootFilesystem: true
+            runAsGroup: 1001
+            runAsNonRoot: true
+            runAsUser: 1001
+            seLinuxOptions: {}
+            seccompProfile:
+              type: RuntimeDefault
+          command:
+            - /bin/bash
+            - -c
+            - |-
+              set -e
+              echo "Waiting for Minio"
+              wait-for-port \
+                --host=minio \
+                --state=inuse \
+                --timeout=120 \
+                80
+              echo "Minio is available"
+          resources:
+            limits:
+              cpu: 150m
+              ephemeral-storage: 2Gi
+              memory: 192Mi
+            requests:
+              cpu: 100m
+              ephemeral-storage: 50Mi
+              memory: 128Mi
+      containers:
+        - name: minio
+          image: docker.io/bitnami/minio:2025.4.8-debian-12-r2
+          imagePullPolicy: "IfNotPresent"
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+              - ALL
+            privileged: false
+            readOnlyRootFilesystem: true
+            runAsGroup: 1001
+            runAsNonRoot: true
+            runAsUser: 1001
+            seLinuxOptions: {}
+            seccompProfile:
+              type: RuntimeDefault
+          command:
+            - /bin/bash
+            - -c
+            - |-
+              set -e
+              echo "Start Minio provisioning"
+
+              # Utility function to retry commands
+              retry_while() {
+                local cmd="${1:?cmd is missing}"
+                local retries="${2:-12}"
+                local sleep_time="${3:-5}"
+                local return_value=1
+                read -r -a command <<< "$cmd"
+                for ((i=1; i<=retries; i++)); do
+                  echo "Attempt $i/$retries: ${command[*]}"
+                  "${command[@]}" && return_value=0 && break
+                  echo "Command failed, retrying in $sleep_time seconds..."
+                  sleep "$sleep_time"
+                done
+                return $return_value
+              }
+
+              # Check if bucket exists
+              check_bucket_exists() {
+                local bucket_name="$1"
+                mc ls "provisioning/$bucket_name" >/dev/null 2>&1
+              }
+
+              # Wait for bucket availability
+              wait_for_bucket() {
+                local bucket_name="$1"
+                local retries=10
+                for ((i=1; i<=retries; i++)); do
+                  if check_bucket_exists "$bucket_name"; then
+                    return 0
+                  fi
+                  echo "Waiting for bucket $bucket_name to be available... ($i/$retries)"
+                  sleep 2
+                done
+                return 1
+              }
+
+              # Attach policy to user or group
+              attach_policy() {
+                local type="$1"
+                local name="$2"
+                local policy="$3"
+                local tmp=$(mc admin $type info provisioning "$name" | sed -n -e 's/^Policy.*: \(.*\)$/\1/p')
+                IFS=',' read -r -a current_policies <<< "$tmp"
+                if [[ ! "${current_policies[*]}" =~ "$policy" ]]; then
+                  echo "Attaching policy $policy to $type $name"
+                  mc admin policy attach provisioning "$policy" --"$type"="$name"
+                else
+                  echo "Policy $policy already attached to $type $name"
+                fi
+              }
+
+              # Detach dangling policies
+              detach_dangling_policies() {
+                local type="$1"
+                local name="$2"
+                local desired_policies="$3"
+                local tmp=$(mc admin $type info provisioning "$name" | sed -n -e 's/^Policy.*: \(.*\)$/\1/p')
+                IFS=',' read -r -a current_policies <<< "$tmp"
+                IFS=',' read -r -a desired_policies_array <<< "$desired_policies"
+                for current in "${current_policies[@]}"; do
+                  if [[ ! "${desired_policies_array[*]}" =~ "${current}" ]]; then
+                    echo "Detaching dangling policy $current from $type $name"
+                    mc admin policy detach provisioning "$current" --"$type"="$name"
+                  fi
+                done
+              }
+
+              # Add user from file
+              add_user_from_file() {
+                local config_file="$1"
+                local username=$(grep -oP '^username=\K.+' "$config_file")
+                local password=$(grep -oP '^password=\K.+' "$config_file")
+                local disabled=$(grep -oP '^disabled=\K.+' "$config_file")
+                local policies_list=$(grep -oP '^policies=\K.+' "$config_file")
+                local set_policies=$(grep -oP '^setPolicies=\K.+' "$config_file")
+
+                if ! mc admin user list provisioning | grep -q "^${username}$"; then
+                  echo "Creating user ${username}"
+                  mc admin user add provisioning "${username}" "${password}"
+                else
+                  echo "User ${username} already exists, skipping creation."
+                fi
+
+                IFS=',' read -r -a policies <<< "${policies_list}"
+                for policy in "${policies[@]}"; do
+                  attach_policy user "${username}" "${policy}"
+                done
+                if [ "${set_policies}" == "true" ]; then
+                  detach_dangling_policies user "${username}" "${policies_list}"
+                fi
+
+                local user_status="enable"
+                if [[ "${disabled}" == "true" ]]; then
+                  user_status="disable"
+                fi
+                echo "Setting user ${username} status to ${user_status}"
+                mc admin user "${user_status}" provisioning "${username}"
+              }
+
+              # Set MinIO alias
+              echo "Setting MinIO alias: provisioning"
+              mc alias set provisioning $MINIO_SCHEME://minio:80 $(<$MINIO_ROOT_USER_FILE) $(<$MINIO_ROOT_PASSWORD_FILE)
+
+              # Apply MinIO configuration
+              echo "Processing MinIO configuration..."
+              echo "Setting config: notify_amqp:rabbitmq"
+              mc admin config set provisioning "notify_amqp:rabbitmq" auto_deleted=off delivery_mode=2 durable=on exchange=video exchange_type=topic internal=off mandatory=off no_wait=off publisher_confirms=off queue_limit=0 routing_key=video.upload url=amqp://transcode:password@simplevod-rabbitmq.default:5672/transcode
+              echo "Restarting MinIO service after configuration..."
+              mc admin service restart provisioning --wait --json
+
+              # Wait for MinIO availability post-restart
+              sleep 5
+              echo "Waiting for Minio to be available after restart"
+              if ! retry_while "mc admin info provisioning"; then
+                echo "Error connecting to Minio"
+                exit 1
+              fi
+              echo "Minio is available. Executing provisioning commands"
+
+              # Create or update policies
+              echo "No policies defined in provisioning.policies"
+
+              # Create or update user policies
+              echo "Processing user policies..."
+              echo "Creating user policy uploader"
+              if ! mc admin policy list provisioning | grep -q "^uploader$"; then
+                mc admin policy create provisioning uploader /etc/ilm/user-policy-uploader.json
+              else
+                echo "User policy uploader already exists. Updating by removing and recreating..."
+                echo "Detaching policy uploader from all users before removal..."
+                mc admin user list provisioning --json | jq -r '.[] | select(.policyName != null and (.policyName | split(",") | map(select(. == "uploader")) | length > 0)) | .accessKey' | while read user; do
+                  if [ ! -z "$user" ]; then
+                    echo "Detaching policy uploader from user $user"
+                    mc admin policy detach provisioning uploader --user="$user"
+                  fi
+                done
+                mc admin policy remove provisioning uploader
+                mc admin policy create provisioning uploader /etc/ilm/user-policy-uploader.json
+              fi
+              echo "Creating user policy prober"
+              if ! mc admin policy list provisioning | grep -q "^prober$"; then
+                mc admin policy create provisioning prober /etc/ilm/user-policy-prober.json
+              else
+                echo "User policy prober already exists. Updating by removing and recreating..."
+                echo "Detaching policy prober from all users before removal..."
+                mc admin user list provisioning --json | jq -r '.[] | select(.policyName != null and (.policyName | split(",") | map(select(. == "prober")) | length > 0)) | .accessKey' | while read user; do
+                  if [ ! -z "$user" ]; then
+                    echo "Detaching policy prober from user $user"
+                    mc admin policy detach provisioning prober --user="$user"
+                  fi
+                done
+                mc admin policy remove provisioning prober
+                mc admin policy create provisioning prober /etc/ilm/user-policy-prober.json
+              fi
+              echo "Creating user policy transcoder"
+              if ! mc admin policy list provisioning | grep -q "^transcoder$"; then
+                mc admin policy create provisioning transcoder /etc/ilm/user-policy-transcoder.json
+              else
+                echo "User policy transcoder already exists. Updating by removing and recreating..."
+                echo "Detaching policy transcoder from all users before removal..."
+                mc admin user list provisioning --json | jq -r '.[] | select(.policyName != null and (.policyName | split(",") | map(select(. == "transcoder")) | length > 0)) | .accessKey' | while read user; do
+                  if [ ! -z "$user" ]; then
+                    echo "Detaching policy transcoder from user $user"
+                    mc admin policy detach provisioning transcoder --user="$user"
+                  fi
+                done
+                mc admin policy remove provisioning transcoder
+                mc admin policy create provisioning transcoder /etc/ilm/user-policy-transcoder.json
+              fi
+
+              # Manage users
+              echo "Processing users..."
+              if ! mc admin user list provisioning | grep -q "^transcoder$"; then
+                echo "Creating user transcoder"
+                mc admin user add provisioning transcoder transcoderpassword
+              else
+                echo "User transcoder already exists. Skipping creation."
+              fi
+              attach_policy user transcoder transcoder
+              echo "Setting user transcoder status to enable"
+              mc admin user enable provisioning transcoder
+              if ! mc admin user list provisioning | grep -q "^uploader$"; then
+                echo "Creating user uploader"
+                mc admin user add provisioning uploader uploaderpassword
+              else
+                echo "User uploader already exists. Skipping creation."
+              fi
+              attach_policy user uploader uploader
+              echo "Setting user uploader status to enable"
+              mc admin user enable provisioning uploader
+              if ! mc admin user list provisioning | grep -q "^prober$"; then
+                echo "Creating user prober"
+                mc admin user add provisioning prober proberpassword
+              else
+                echo "User prober already exists. Skipping creation."
+              fi
+              attach_policy user prober prober
+              echo "Setting user prober status to enable"
+              mc admin user enable provisioning prober
+
+              # Manage users from existing secrets
+              echo "No users defined in provisioning.usersExistingSecrets"
+
+              # Manage groups
+              echo "No groups defined in provisioning.groups"
+
+              # Manage buckets
+              echo "Processing buckets..."
+              echo "Creating/checking bucket raw..."
+              mc mb provisioning/raw --ignore-existing --region=us-east-1 --with-lock || echo "Warning: Failed to create bucket raw"
+              wait_for_bucket "raw" || echo "Warning: Bucket raw not available after creation"
+              echo "Setting lifecycle policy for bucket raw..."
+              if check_bucket_exists "raw"; then
+                mc ilm import provisioning/raw < /etc/ilm/bucket-raw.json || echo "Warning: Failed to set lifecycle for bucket raw"
+              else
+                echo "Warning: Bucket raw not available for lifecycle configuration"
+              fi
+              echo "Setting quota for bucket raw..."
+              mc quota set provisioning/raw --size 1GiB
+              echo "Setting tags for bucket raw..."
+              mc tag set provisioning/raw "content=Raw videos"
+              echo "Processing event notifications for bucket raw..."
+              echo "Checking for existing event notification on provisioning/raw for ARN arn:minio:sqs::rabbitmq:amqp..."
+              
+              # Debug: Show current event list
+              echo "Current events on provisioning/raw:"
+              mc event list "provisioning/raw" --json || echo "No events or error listing events"
+              
+              # Check if notification already exists with simpler logic
+              EXISTING_EVENTS=$(mc event list "provisioning/raw" --json 2>/dev/null | jq -r '.[] | select(.arn == "arn:minio:sqs::rabbitmq:amqp") | .events[]' 2>/dev/null | sort | tr '\n' ',' | sed 's/,$//')
+              DESIRED_EVENTS="put"
+              
+              echo "Existing events for ARN arn:minio:sqs::rabbitmq:amqp: '$EXISTING_EVENTS'"
+              echo "Desired events: '$DESIRED_EVENTS'"
+              
+              if [ "$EXISTING_EVENTS" = "$DESIRED_EVENTS" ]; then
+                echo "Event notification for ARN arn:minio:sqs::rabbitmq:amqp already exists with matching events. Skipping."
+              else
+                echo "Notification not found or different. Adding/updating event notification..."
+                
+                # Remove existing notification if it exists
+                if [ ! -z "$EXISTING_EVENTS" ]; then
+                  echo "Removing existing notification for ARN arn:minio:sqs::rabbitmq:amqp"
+                  mc event remove "provisioning/raw" --arn "arn:minio:sqs::rabbitmq:amqp" || echo "Warning: Failed to remove existing notification"
+                fi
+                
+                # Add new notification
+                EVENT_CMD="mc event add \"provisioning/raw\" \"arn:minio:sqs::rabbitmq:amqp\" --event \"put\""
+                echo "Executing: $EVENT_CMD"
+                eval "$EVENT_CMD" || echo "Warning: Failed to set event notification for arn:minio:sqs::rabbitmq:amqp on provisioning/raw"
+                
+                # Verify the notification was added
+                echo "Verifying notification was added:"
+                mc event list "provisioning/raw" --json || echo "Error verifying notification"
+              fi
+              echo "Creating/checking bucket thumbnail..."
+              mc mb provisioning/thumbnail --ignore-existing --region=us-east-1  || echo "Warning: Failed to create bucket thumbnail"
+              wait_for_bucket "thumbnail" || echo "Warning: Bucket thumbnail not available after creation"
+              echo "Setting quota for bucket thumbnail..."
+              mc quota set provisioning/thumbnail --size 500MiB
+              echo "Suspending versioning for bucket thumbnail"
+              mc version suspend provisioning/thumbnail
+              echo "Setting tags for bucket thumbnail..."
+              mc tag set provisioning/thumbnail "content=Video thumbnails"
+              echo "Creating/checking bucket stream..."
+              mc mb provisioning/stream --ignore-existing --region=us-east-1  || echo "Warning: Failed to create bucket stream"
+              wait_for_bucket "stream" || echo "Warning: Bucket stream not available after creation"
+              echo "Setting quota for bucket stream..."
+              mc quota set provisioning/stream --size 1GiB
+              echo "Suspending versioning for bucket stream"
+              mc version suspend provisioning/stream
+              echo "Setting tags for bucket stream..."
+              mc tag set provisioning/stream "content=Transcoded HLS segments and playlists"
+
+              # Apply bucket anonymous policies (after buckets are created)
+              echo "Processing bucket anonymous policies..."
+              echo "Setting anonymous policy for bucket stream"
+              if check_bucket_exists "stream"; then
+                echo "Setting download-only anonymous access for stream"
+                mc anonymous set download provisioning/stream
+              else
+                echo "Warning: Bucket stream does not exist. Skipping anonymous policy."
+              fi
+              echo "Setting anonymous policy for bucket thumbnail"
+              if check_bucket_exists "thumbnail"; then
+                echo "Setting download-only anonymous access for thumbnail"
+                mc anonymous set download provisioning/thumbnail
+              else
+                echo "Warning: Bucket thumbnail does not exist. Skipping anonymous policy."
+              fi
+
+              echo "End Minio provisioning"
+          env:
+            - name: MINIO_SCHEME
+              value: "http"
+            - name: MINIO_ROOT_USER_FILE
+              value: /opt/bitnami/minio/secrets/root-user
+            - name: MINIO_ROOT_PASSWORD_FILE
+              value: /opt/bitnami/minio/secrets/root-password
+          envFrom:
+          resources:
+            limits:
+              cpu: 150m
+              ephemeral-storage: 2Gi
+              memory: 192Mi
+            requests:
+              cpu: 100m
+              ephemeral-storage: 50Mi
+              memory: 128Mi
+          volumeMounts:
+            - name: empty-dir
+              mountPath: /.mc
+              subPath: app-mc-dir
+            - name: empty-dir
+              mountPath: /opt/bitnami/minio/tmp
+              subPath: app-tmp-dir
+            - name: empty-dir
+              mountPath: /tmp
+              subPath: tmp-dir
+            - name: minio-provisioning
+              mountPath: /etc/ilm
+            - name: minio-credentials
+              mountPath: /opt/bitnami/minio/secrets/
+      volumes:
+        - name: empty-dir
+          emptyDir: {}
+        - name: minio-provisioning
+          configMap:
+            name: minio-provisioning
+        - name: minio-credentials
+          secret:
+            secretName: minio

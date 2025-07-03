@@ -1,0 +1,730 @@
+global: 
+  jwtAuth:
+    secret: supersecurejwtsecretkey
+    algorithm: HS256
+    expire: 6h
+
+  postgresql_users:
+    nameOverride: postgresql-users
+    auth:
+      username: user
+      password: password
+      database: users
+    service:
+      ports:
+        postgresql: 5432
+
+  redis_users:
+    nameOverride: redis-users
+    redis:
+      password: "redisuserspassword"
+
+  redis_upload:
+    nameOverride: redis-upload
+    auth: 
+      password: "redisuploadpassword"
+
+  redis_transcode:
+    nameOverride: redis-transcode
+    auth:
+      password: "redistranscodepassword"
+
+  minio:
+    nameOverride: minio
+    apiIngressHost: api.minio.simplevod.app
+    consoleIngressHost: api.minio.simplevod.app
+
+  mongodb:
+    nameOverride: mongodb
+
+  users: 
+    nameOverride: users
+    service: 
+      port: 50051
+
+  auth: 
+    nameOverride: auth
+    ingressHost: auth.simplevod.app
+    service:
+      port: 8100
+
+  upload:
+    nameOverride: upload
+    ingressHost: upload.simplevod.app
+    service:
+      port: 8200
+
+  videos:
+    nameOverride: videos
+    ingressHost: videos.simplevod.app
+    service:
+      port: 8300
+
+  frontend:
+    nameOverride: frontend
+    ingressHost: simplevod.app
+    service:
+      port: 3000
+
+  rabbitmq:
+    nameOverride: rabbitmq
+    auth:
+      username: user
+      password: password
+     
+postgresql_users:
+  # -----------
+  nameOverride: postgresql-users
+  auth:
+    postgresPassword: postgres
+    username: user
+    password: password
+    database: users
+  # -----------
+  primary:
+    persistence:
+      enabled: false
+      size: 1Gi
+
+redis_users:
+  nameOverride: redis-users
+  auth: 
+    password: "redisuserspassword"
+  architecture: standalone
+  master:
+    count: 1
+    persistence:
+      enabled: true
+      size: 1Gi
+  metrics:
+    enabled: true
+
+users:
+  nameOverride: users
+  grpcServer:
+    image:
+      repository: simplevod/users
+      pullPolicy: IfNotPresent
+      tag: latest
+    service:
+      port: 50051
+  celeryWorker:
+    image:
+      repository: simplevod/users
+      pullPolicy: IfNotPresent
+      tag: latest
+  email:
+    server: smtp.gmail.com
+    port: 465
+    address: ""
+    password: ""
+
+auth: 
+  nameOverride: auth
+  image:
+    repository: simplevod/auth
+    pullPolicy: IfNotPresent
+    tag: latest
+  service:
+    port: 8100
+  ingress:
+    enabled: true
+    className: "nginx"
+    annotations:
+      nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    hosts:
+      - host: auth.simplevod.app
+        paths:
+          - path: /
+            pathType: ImplementationSpecific
+    tls:
+      - hosts:
+          - auth.simplevod.app
+        secretName: ingress-tls
+
+frontend:
+  upload: 
+    chunkSize: 5
+    concurrentChunks: 3
+
+redis_upload:
+  nameOverride: redis-upload
+  auth: 
+    password: "redisuploadpassword"
+  architecture: standalone
+  master:
+    count: 1
+    persistence:
+      enabled: true
+      size: 1Gi
+  metrics:
+    enabled: true
+
+redis_transcode:
+  nameOverride: redis-transcode
+  auth:
+    password: "redistranscodepassword"
+  architecture: standalone
+  master:
+    count: 1
+    persistence:
+      enabled: true
+      size: 1Gi
+  metrics:
+    enabled: true
+
+
+minio:
+  nameOverride: minio
+  persistence:
+    enabled: true
+    size: 2Gi
+  mode: standalone
+  
+  auth:
+    rootUser: admin
+    rootPassword: admin123
+  
+  provisioning:
+    enabled: true
+    sleepTime: 5
+  
+    buckets:
+      - name: raw
+        region: us-east-1
+        versioning: Suspended
+        withLock: true
+        lifecycle:
+          - id: TestPrefix7dRetention
+            prefix: test-prefix
+            disabled: false
+            expiry:
+              days: 7
+              nonconcurrentDays: 3
+        quota:
+          type: set
+          size: 1GiB
+        tags:
+          content: "Raw videos"
+        # cors: |
+        #   <CORSConfiguration>
+        #       <CorsRule>
+        #           <AllowedOrigin>*</AllowedOrigin>
+        #           <AllowedMethod>GET</AllowedMethod>
+        #       </CorsRule>
+        #   </CORSConfiguration>
+        eventNotifications:
+          - arn: "arn:minio:sqs::rabbitmq:amqp"
+            events:
+              - "put"
+      - name: thumbnail
+        region: us-east-1
+        quota:
+          type: set
+          size: 500MiB
+        tags:
+          content: "Video thumbnails"
+      - name: stream
+        region: us-east-1
+        quota:
+          type: set
+          size: 1GiB
+        tags:
+          content: "Transcoded HLS segments and playlists"
+  
+    bucketAnonymousPolicies:
+      - name: stream
+        statements:
+          - resources:
+              - "arn:aws:s3:::stream/*"
+            effect: "Allow"
+            actions:
+              - "s3:GetObject"
+            principals: 
+              - "*"
+      - name: thumbnail
+        statements:
+          - resources:
+              - "arn:aws:s3:::thumbnail/*"
+            effect: "Allow"
+            actions:
+              - "s3:GetObject"
+            principals: 
+              - "*"
+  
+    users:
+      - username: transcoder
+        password: transcoderpassword
+        policies:
+          - transcoder
+      - username: uploader
+        password: uploaderpassword
+        policies:
+          - uploader
+      - username: prober
+        password: proberpassword
+        policies:
+          - prober
+  
+    userPolicies:
+      - name: uploader
+        statements:
+          - resources:
+              - "arn:aws:s3:::raw/"
+            effect: "Allow"
+            actions:
+              - "s3:GetBucketLocation"
+              - "s3:ListBucket"
+              - "s3:ListBucketMultipartUploads"
+          - resources:
+              - "arn:aws:s3:::raw/*"
+            effect: "Allow"
+            actions:
+              - "s3:AbortMultipartUpload"
+              - "s3:DeleteObject"
+              - "s3:GetObject"
+              - "s3:ListMultipartUploadParts"
+              - "s3:PutObject"
+          - resources:
+              - "arn:aws:s3:::thumbnail/"
+            effect: "Allow"
+            actions:
+              - "s3:GetBucketLocation"
+              - "s3:ListBucket"
+          - resources:
+              - "arn:aws:s3:::thumbnail/*"
+            effect: "Allow"
+            actions:
+              - "s3:DeleteObject"
+              - "s3:GetObject"
+              - "s3:PutObject"
+      - name: prober
+        statements:
+          - resources:
+              - "arn:aws:s3:::raw/"
+            effect: "Allow"
+            actions:
+              - "s3:GetBucketLocation"
+              - "s3:ListBucket"
+          - resources:
+              - "arn:aws:s3:::raw/*"
+            effect: "Allow"
+            actions:
+              - "s3:GetObject"
+      - name: transcoder
+        statements:
+          - resources:
+              - "arn:aws:s3:::stream/"
+            effect: "Allow"
+            actions:
+              - "s3:GetBucketLocation"
+              - "s3:ListBucket"
+          - resources:
+              - "arn:aws:s3:::stream/*"
+            effect: "Allow"
+            actions:
+              - "s3:GetObject"
+              - "s3:PutObject"
+  
+    config:
+      - name: notify_amqp:rabbitmq
+        options:
+          url: "amqp://transcode:password@simplevod-rabbitmq.default:5672/transcode"
+          exchange: "video"
+          exchange_type: "topic"
+          routing_key: "video.upload"
+          mandatory: "off"
+          durable: "on"
+          no_wait: "off"
+          internal: "off"
+          auto_deleted: "off"
+          delivery_mode: "2"
+          publisher_confirms: "off"
+          queue_limit: "0"
+          queue_dir: ""
+  
+  metrics:
+    enabled: true
+  
+  
+  containerPorts:
+    api: 9000
+    console: 9001
+  
+  service:
+    ports:
+      api: 80
+      console: 9001
+  
+  ingress:
+    enabled: true
+    ingressClassName: "nginx"
+    hostname: console.minio.simplevod.app
+    tls: true
+    extraTls:
+    - hosts:
+        - console.minio.simplevod.app
+      secretName: ingress-tls
+    annotations:
+      nginx.ingress.kubernetes.io/ssl-redirect: "true"
+  
+  apiIngress:
+    enabled: true
+    hostname: api.minio.simplevod.app
+    path: /
+    pathType: ImplementationSpecific
+    tls: true
+    extraTls:
+    - hosts:
+        - api.minio.simplevod.app
+      secretName: ingress-tls
+    annotations:
+      nginx.ingress.kubernetes.io/proxy-body-size: "0"
+      nginx.ingress.kubernetes.io/proxy-read-timeout: "600"
+      nginx.ingress.kubernetes.io/proxy-send-timeout: "600"
+      nginx.ingress.kubernetes.io/client-body-buffer-size: "1m"
+      nginx.ingress.kubernetes.io/ssl-redirect: "false"
+      nginx.ingress.kubernetes.io/backend-protocol: "HTTP"
+
+mongodb:
+  nameOverride: mongodb
+  auth:
+    enabled: true
+    rootUser: root
+    rootPassword: rootpassword
+    usernames: ["user"]
+    passwords: ["password"]
+    databases: ["upload"]
+  replicaCount: 2
+  persistence:
+    enabled: true
+    size: 1Gi
+  arbiter:
+    enabled: true
+  metrics:
+    enabled: true
+
+upload: 
+  nameOverride: upload
+  image:
+    repository: simplevod/upload
+    pullPolicy: IfNotPresent
+    tag: latest
+  minio:
+    endpoint: api.minio.simplevod.app
+    externalEndpoint: api.minio.simplevod.app
+    access_key: uploader
+    secret_key: uploaderpassword
+    use_ssl: false
+  mongodb:
+    # username: user
+    # password: password
+    username: root
+    password: rootpassword
+    # database: upload
+    database: ""
+  redis:
+    password: "redisuploadpassword"
+  service:
+    port: 8200
+  ingress:
+    enabled: true
+    className: "nginx"
+    annotations:
+      nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    hosts:
+      - host: upload.simplevod.app
+        paths:
+          - path: /
+            pathType: ImplementationSpecific
+    tls:
+      - hosts:
+          - upload.simplevod.app
+        secretName: ingress-tls
+
+rabbitmq:
+  nameOverride: rabbitmq
+  auth:
+    username: user
+    password: password
+  plugins: "rabbitmq_management rabbitmq_peer_discovery_k8s"
+  extraPlugins: "rabbitmq_auth_backend_ldap prometheus"
+  clustering:
+    enabled: true
+  extraSecrets:
+    load-definition:
+      load_definition.json: |
+        {
+          "vhosts": [
+            {
+              "name": "transcode",
+              "tags": []
+            }
+          ],
+          "users": [
+            {
+              "name": "admin",
+              "password_hash": "h8xIo0Ifyk0DYLgyu/ofbCW9QbzqMES3phlPONznSfX97o91",
+              "hashing_algorithm": "rabbit_password_hashing_sha256",
+              "tags": [
+                "administrator"
+              ],
+              "limits": {}
+            },
+            {
+              "name": "transcode",
+              "password_hash": "h8xIo0Ifyk0DYLgyu/ofbCW9QbzqMES3phlPONznSfX97o91",
+              "hashing_algorithm": "rabbit_password_hashing_sha256",
+              "tags": [
+                "management"
+              ],
+              "limits": {}
+            }
+          ],
+          "permissions": [
+            {
+              "user": "admin",
+              "vhost": "transcode",
+              "configure": ".*",
+              "write": ".*",
+              "read": ".*"
+            },
+            {
+              "user": "transcode",
+              "vhost": "transcode",
+              "configure": "^video$|^upload$|^transcode$|^playlist$|^finish$",  
+              "write": ".*",
+              "read": ".*"
+            }
+          ],
+          "exchanges": [
+            {
+              "name": "video",
+              "vhost": "transcode",
+              "type": "topic",
+              "durable": true,
+              "auto_delete": false,
+              "arguments": {}
+            }
+          ],
+          "queues": [
+            {
+              "name": "upload",
+              "vhost": "transcode",
+              "durable": true,
+              "auto_delete": false,
+              "arguments": {
+                "x-max-length": 10000
+              }
+            },
+            {
+              "name": "transcode",
+              "vhost": "transcode",
+              "durable": true,
+              "auto_delete": false,
+              "arguments": {
+                "x-queue-type": "classic"
+              }
+            },
+            {
+              "name": "playlist",
+              "vhost": "transcode",
+              "durable": true,
+              "auto_delete": false,
+              "arguments": {
+                "x-queue-type": "classic"
+              }
+            },
+            {
+              "name": "finish",
+              "vhost": "transcode",
+              "durable": true,
+              "auto_delete": false,
+              "arguments": {
+                "x-queue-type": "classic"
+              }
+            }
+          ],
+          "bindings": [
+            {
+              "source": "video",
+              "vhost": "transcode",
+              "destination": "upload",
+              "destination_type": "queue",
+              "routing_key": "video.upload",
+              "arguments": {}
+            },
+            {
+              "source": "video",
+              "vhost": "transcode",
+              "destination": "transcode",
+              "destination_type": "queue",
+              "routing_key": "video.transcode",
+              "arguments": {}
+            },
+            {
+              "source": "video",
+              "vhost": "transcode",
+              "destination": "playlist",
+              "destination_type": "queue",
+              "routing_key": "video.playlist",
+              "arguments": {}
+            },
+            {
+              "source": "video",
+              "vhost": "transcode",
+              "destination": "finish",
+              "destination_type": "queue",
+              "routing_key": "video.finish",
+              "arguments": {}
+            }
+          ],
+          "policies": []
+        }
+  loadDefinition:
+    enabled: true
+    existingSecret: load-definition
+  extraConfiguration: |
+    load_definitions = /app/load_definition.json
+  containerPorts:
+    amqp: 5672
+    amqpTls: 5671
+    dist: 25672
+    manager: 15672
+    epmd: 4369
+    metrics: 9419
+  replicaCount: 1
+  resourcesPreset: "small"
+  persistence:
+    enabled: true
+    size: 1Gi
+  metrics:
+    enabled: false
+
+iframebreaker:
+  nameOverride: iframebreaker 
+  image:
+    repository: simplevod/iframebreaker
+    pullPolicy: IfNotPresent
+    tag: latest
+  minio:
+    endpoint: "api.minio.simplevod.app"
+    rawBucket: raw
+    accessKey: prober
+    secretKey: proberpassword
+    secure: false
+  rabbitmq:
+    vhost: transcode
+    user: transcode
+    password: password
+    exchange: video
+    routingKey: video.transcode
+    queue: upload
+  config:
+    minPeriodSeconds: 5.0
+    maxPeriodSeconds: 8.0
+    messagespanSeconds: 60.0
+    healthCheckPort: 8080
+
+  retry:
+    maxRetries: 5
+    retryDelay: 5
+    heartbeat: 30
+    connectionAttempts: 3
+    
+  circuitBreaker:
+    failureThreshold: 3
+    timeout: 60
+
+
+transcoder:
+  rabbitmq:
+    user: "transcode"
+    password: "password"
+    vhost: "transcode"
+    queue: "transcode"
+    prefetch: 5
+  redis:
+    password: "redistranscodepassword"
+  minio:
+    endpoint: "api.minio.simplevod.app"
+    accessKey: "transcoder"
+    secretKey: "transcoderpassword"
+    bucket: stream
+    mcAlias: transcoder
+  transcode:
+    image: simplevod/transcode:latest
+    preset: ultrafast
+    # resolutions: 240,360,480,720,1080
+    # crfMap: 240:36,360:34,480:32,720:30,1080:28
+    # masterPlaylist: 240:500000,360:800000,480:1200000,720:2000000,1080:5000000
+    resolutions: 240,720
+    crfMap: 240:36,720:30
+    masterPlaylist: 240:500000,720:2000000
+
+
+playlist:
+  image:
+    repository: simplevod/playlist
+    pullPolicy: IfNotPresent
+    tag: latest
+  minio:
+    endpoint: api.minio.simplevod.app
+    accessKey: transcoder
+    secretKey: transcoderpassword
+    bucket: stream
+  rabbitmq:
+    user: "transcode"
+    password: "password"
+    vhost: "transcode"
+    queue: "playlist"
+    exchange: "video"
+    routingKey: "video.finish"
+  redis:
+    password: "redistranscodepassword"
+
+
+finalizer:
+  image:
+    repository: simplevod/finalizer
+    pullPolicy: IfNotPresent
+    tag: latest
+  minio:
+    bucket: stream
+    publicHostname: api.minio.simplevod.app
+    publicScheme: http
+  rabbitmq:
+    user: "transcode"
+    password: "password"
+    vhost: "transcode"
+    queue: "finish"
+  redis:
+    password: "redistranscodepassword"
+  mongodb:
+    username: root
+    password: rootpassword
+    database: upload
+
+
+videos:
+  image:
+    repository: simplevod/videos
+    pullPolicy: IfNotPresent
+    tag: latest
+  service:
+    port: 8300
+  ingress:
+    enabled: true
+    className: "nginx"
+    annotations: {}
+      # kubernetes.io/ingress.class: nginx
+      # kubernetes.io/tls-acme: "true"
+    hosts:
+      - host: videos.simplevod.app
+        paths:
+          - path: /
+            pathType: ImplementationSpecific
+    tls:
+     - secretName: ingress-tls
+       hosts:
+         - videos.simplevod.app

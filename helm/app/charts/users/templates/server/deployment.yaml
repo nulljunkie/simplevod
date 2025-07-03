@@ -1,0 +1,131 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "users.fullname" . }}
+  labels:
+    {{- include "users.labels" . | nindent 4 }}
+spec:
+  {{- if not .Values.grpcServer.autoscaling.enabled }}
+  replicas: {{ .Values.grpcServer.replicas }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "users.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      {{- with .Values.grpcServer.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        {{- include "users.labels" . | nindent 8 }}
+        {{- with .Values.grpcServer.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      {{- with .Values.grpcServer.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "users.serviceAccountName" . }}
+      {{- with .Values.grpcServer.podSecurityContext }}
+      securityContext:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: {{ .Chart.Name }}
+          {{- with .Values.grpcServer.securityContext }}
+          securityContext:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          image: "{{ .Values.grpcServer.image.repository }}:{{ .Values.grpcServer.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.grpcServer.image.pullPolicy }}
+          {{- if .Values.grpcServer.command }}
+          command:
+            {{- range .Values.grpcServer.command }}
+            - {{ . | quote }}
+            {{- end }}
+          {{- end }}
+          {{- if .Values.grpcServer.args }}
+          args:
+            {{- range .Values.grpcServer.args }}
+            - {{ . | quote }}
+            {{- end }}
+          {{- end }}
+          ports:
+            - name: grpc
+              containerPort: {{ include "users.port" . }}
+              protocol: TCP
+            - name: health
+              containerPort: 8082
+              protocol: TCP
+          env:
+            - name: GRPC_SERVER_PORT
+              value: {{ include "users.port" . | quote }}
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "users.fullname" . }}
+                  key: database_url
+            - name: CELERY_BROKER_URL
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "users.fullname" . }}
+                  key: celery_broker_url
+            - name: CELERY_BACKEND_URL
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "users.fullname" . }}
+                  key: celery_backend_url
+            - name: EMAIL_ADDRESS
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "users.fullname" . }}
+                  key: email_address
+            - name: EMAIL_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "users.fullname" . }}
+                  key: email_password
+            - name: EMAIL_SERVER_NAME
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "users.fullname" . }}
+                  key: email_server_name
+            - name: EMAIL_SERVER_PORT
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "users.fullname" . }}
+                  key: email_server_port
+          {{- with .Values.grpcServer.livenessProbe }}
+          livenessProbe:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.grpcServer.readinessProbe }}
+          readinessProbe:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.grpcServer.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.grpcServer.volumeMounts }}
+          volumeMounts:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+      {{- with .Values.grpcServer.volumes }}
+      volumes:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.grpcServer.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.grpcServer.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.grpcServer.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

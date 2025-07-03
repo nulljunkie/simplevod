@@ -1,0 +1,427 @@
+services:
+
+  minio:
+    image: minio/minio
+    command: server /data --console-address ":9001"
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    environment:
+      MINIO_ROOT_USER: minio
+      MINIO_ROOT_PASSWORD: minio123
+    volumes:
+      - ./.data/minio:/data
+      - ./minio:/bootstrap
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/ready"]
+      interval: 5s
+      retries: 5
+    networks:
+      - vod-network
+
+  mc-client:
+    image: minio/mc
+    entrypoint: ["/bin/sh", "-c"]
+    command: >
+      "sleep 5 &&
+      /bootstrap/init.sh"
+    volumes:
+      - ./minio:/bootstrap
+    environment:
+      MINIO_URL: http://minio:9000
+      MINIO_ACCESS_KEY: minio
+      MINIO_SECRET_KEY: minio123
+      RABBITMQ_URL: amqp://user:password@rabbitmq:5672/transcode
+      EXCHANGE: video
+      EXCHANGE_TYPE: topic
+      ROUTING_KEY: video.upload
+    depends_on:
+      rabbitmq:
+        condition: service_started
+      minio:
+        condition: service_healthy
+    networks:
+      - vod-network
+
+  redis-transcode:
+    image: redis:alpine
+    command: redis-server --port 6379 --requirepass password
+    ports:
+      - "6379:6379"
+    volumes:
+      - ./.data/redis-transcode:/data
+    environment:
+      REDIS_PASSWORD: password
+    networks:
+      - vod-network
+
+  rabbitmq:
+    image: rabbitmq:4-management
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    environment:
+      RABBITMQ_DEFAULT_USER: user
+      RABBITMQ_DEFAULT_PASS: password
+      RABBITMQ_SERVER_ADDITIONAL_ERL_ARGS: "-rabbitmq_management load_definitions \"/etc/rabbitmq/definitions.json\""
+    volumes:
+      - ./.data/rabbitmq:/var/lib/rabbitmq
+      - ./rabbitmq_definitions.json:/etc/rabbitmq/definitions.json:ro
+    healthcheck:
+      test: ["CMD", "rabbitmqctl", "status"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - vod-network
+
+  mongo:
+    image: mongo
+    ports:
+      - 27017:27017
+    environment:
+      - MONGO_INITDB_ROOT_USERNAME=user
+      - MONGO_INITDB_ROOT_PASSWORD=password
+    volumes:
+      - ./.data/mongodb:/data/db
+    networks:
+      - vod-network
+
+  mongo-express:
+    image: mongo-express
+    restart: unless-stopped
+    environment:
+      ME_CONFIG_MONGODB_SERVER: mongo
+      ME_CONFIG_BASICAUTH_USERNAME: password
+      ME_CONFIG_BASICAUTH_PASSWORD: password
+    ports:
+      - 8900:8081
+    depends_on:
+      - mongo
+    networks:
+      - vod-network
+
+  frontend:
+    build:
+      context: ./frontend/
+    image: simplevod/frontend:latest
+    ports:
+      - 3000:3000
+    environment:
+      - NUXT_PUBLIC_STREAM_SERVICE_URL=http://videos:8300/api
+      - NUXT_PUBLIC_AUTH_SERVICE_URL=http://auth:8100/api
+      - NUXT_PUBLIC_UPLOAD_SERVICE_URL=http://upload:8200/upload
+      - NUXT_PUBLIC_UPLOAD_CHUNK_SIZE_MB=5
+      - NUXT_PUBLIC_APP_NAME=SimpleVOD
+      - NUXT_PUBLIC_UPLOAD_CONCURRENT_CHUNKS=3
+    networks:
+      - vod-network
+
+  auth:
+    build:
+      context: ./auth/
+    command: node server.js
+    image: simplevod/auth:latest
+    ports:
+      - 8100:8100
+    environment:
+      - GRPC_SERVER_ADDRESS=users:50051
+      - SECRET_KEY=5d039bfd062bd2490f0fbd6d46e324d0caa95ea89807e1c73b0b96e8caa2f6c2
+      - JWT_ALGORITHM=HS256
+      - JWT_ACCESS__EXPIRE_=6h
+    volumes:
+      - ./auth:/app
+    depends_on:
+      - users
+    networks:
+      - vod-network
+
+  postgres-users:
+    image: postgres:alpine
+    environment:
+      - POSTGRES_USER=user
+      - POSTGRES_PASSWORD=password
+      - POSTGRES_DB=users_db
+    ports:
+      - 5433:5432
+    volumes:
+      - ./.data/postgres:/var/lib/postgresql/data
+    networks:
+      - vod-network
+
+  pgadmin:
+    image: dpage/pgadmin4
+    depends_on:
+      - postgres-users
+    environment:
+      PGADMIN_DEFAULT_EMAIL: test@vod.com
+      PGADMIN_DEFAULT_PASSWORD: test
+    ports:
+      - 8800:80
+    networks:
+      - vod-network
+
+  redis-users:
+    image: redis:alpine
+    ports:
+      - 6380:6379
+    environment:
+      - REDIS_PASSWORD=password
+    command: ["redis-server", "--requirepass", "password"]
+    volumes:
+      - ./.data/redis-users:/data
+    networks:
+      - vod-network
+
+  users:
+    build:
+      context: ./users/
+    command: python main.py
+    image: simplevod/users:latest
+    ports:
+      - 50051:50051
+      - 8084:8084
+    environment:
+      - DATABASE_URL=postgresql://user:password@postgres-users:5432/users_db
+      - CELERY_BROKER_URL=redis://:password@redis-users:6379/1
+      - CELERY_BACKEND_URL=redis://:password@redis-users:6379/1
+      - EMAIL_ADDRESS=ltocode36@gmail.com
+      - EMAIL_SERVER_NAME=smtp.gmail.com
+      - EMAIL_SERVER_PORT=465
+      - EMAIL_PASSWORD=wpqboluywphmuvsx
+    volumes:
+      - ./users:/app
+    depends_on:
+      - postgres-users
+      - celery
+    networks:
+      - vod-network
+
+  celery:
+    build:
+      context: ./users/
+    command: celery -A tasks worker --loglevel=info --queues=email
+    image: simplevod/users-celery:latest
+    environment:
+      - CELERY_BROKER_URL=redis://:password@redis-users:6379/1
+      - CELERY_BACKEND_URL=redis://:password@redis-users:6379/1
+      - EMAIL_ADDRESS=ltocode36@gmail.com
+      - EMAIL_SERVER_NAME=smtp.gmail.com
+      - EMAIL_SERVER_PORT=465
+      - EMAIL_PASSWORD=wpqboluywphmuvsx
+    depends_on:
+      - redis-users
+    networks:
+      - vod-network
+
+  redis-upload:
+    image: redis:alpine
+    ports:
+      - 6381:6379
+    environment:
+      - REDIS_PASSWORD=password
+    command: ["redis-server", "--requirepass", "password"]
+    volumes:
+      - ./.data/redis-upload:/data
+    networks:
+      - vod-network
+
+  upload:
+    build:
+      context: ./upload/
+    command: python main.py
+    image: simplevod/upload:latest
+    ports:
+      - 8200:8200
+    environment:
+      - MINIO_ENDPOINT=minio:9000
+      - MINIO_ACCESS_KEY=uploader
+      - MINIO_SECRET_KEY=uploaderpassword
+      - MINIO_BUCKET=raw
+      - MINIO_USE_SSL=False
+      - MONGO_URL=mongodb://user:password@mongo:27017
+      - MONGO_DB_NAME=upload
+      - REDIS_HOST=redis-upload
+      - REDIS_PORT=6379
+      - REDIS_PASSWORD=password
+      - REDIS_DB=0
+      - REDIS_SESSION_EXPIRY_SECONDS=604800
+      - JWT_SECRET_KEY=5d039bfd062bd2490f0fbd6d46e324d0caa95ea89807e1c73b0b96e8caa2f6c2
+      - JWT_ALGORITHM=HS256
+    volumes:
+      - ./upload:/app
+    depends_on:
+      - mc-client
+      - redis-upload
+      - mongo
+    networks:
+      - vod-network
+
+  playlist:
+    build:
+      context: ./playlist/
+    command: python main.py
+    image: simplevod/playlist:latest
+    environment:
+      - RABBITMQ_HOST=rabbitmq
+      - RABBITMQ_PORT=5672
+      - RABBITMQ_USER=transcode
+      - RABBITMQ_PASSWORD=password
+      - RABBITMQ_VHOST=transcode
+      - RABBITMQ_PLAYLIST_QUEUE=playlist
+      - RABBITMQ_EXCHANGE_NAME=video
+      - RABBITMQ_ROUTING_KEY=video.finish
+      - REDIS_HOST=redis-transcode
+      - REDIS_PORT=6379
+      - REDIS_PASSWORD=password
+      - REDIS_DB=0
+      - MINIO_ENDPOINT=minio:9000
+      - MINIO_ACCESS_KEY=transcoder
+      - MINIO_SECRET_KEY=transcoderpassword
+      - MINIO_TRANSCODE_BUCKET=stream
+      - MINIO_USE_SSL=false
+    depends_on:
+      - mc-client
+      - rabbitmq
+      - redis-transcode
+    networks:
+      - vod-network
+
+  iframebreaker:
+    build:
+      context: ./iframebreaker/
+    image: simplevod/iframebreaker:latest
+    environment:
+      - MINIO_ENDPOINT=minio:9000
+      - MINIO_ACCESS_KEY=prober
+      - MINIO_SECRET_KEY=proberpassword
+      - MINIO_SECURE=false
+      - RABBITMQ_HOST=rabbitmq
+      - RABBITMQ_PORT=5672
+      - RABBITMQ_VHOST=transcode
+      - RABBITMQ_USER=transcode
+      - RABBITMQ_PASSWORD=password
+      - RABBITMQ_PUBLISH_EXCHANGE=video
+      - RABBITMQ_PUBLISH_ROUTING_KEY=video.transcode
+      - RABBITMQ_CONSUME_QUEUE=upload
+      - SPLIT_DURATION_SECONDS=60.0
+      - PRESIGNED_URL_EXPIRY_HOURS=24
+    depends_on:
+      mc-client:
+        condition: service_started
+      rabbitmq:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    networks:
+      - vod-network
+
+  transcoder:
+    build:
+      context: ./transcoder/
+    image: simplevod/transcoder:latest
+    environment:
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: 5672
+      RABBITMQ_VHOST: transcode
+      RABBITMQ_USER: transcode
+      RABBITMQ_PASSWORD: password
+      RABBITMQ_CONSUME_QUEUE: transcode
+      RABBITMQ_PREFETCH: 5
+      REDIS_HOST: redis-transcode
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: password
+      REDIS_DB: 0
+      KUBERNETES_NAMESPACE: default
+      MINIO_SECRET_NAME: minio-secret
+      TRANSCODE_IMAGE: transcode:latest
+      TRANSCODE_PRESET: ultrafast
+      RESOLUTIONS: 240,360,480,720,1080
+      CRF_MAP: 240:36,360:34,480:32,720:30,1080:28
+      MASTER_PLAYLIST: 240:500000,360:800000,480:1200000,720:2000000,1088:5000000
+      MINIO_ENDPOINT: minio:9000
+      MINIO_ACCESS_KEY: minio
+      MINIO_SECRET_KEY: minio123
+      MINIO_USE_SSL: false
+      MINIO_OUTPUT_BUCKET: stream
+      MAX_CONCURRENT_HANDLERS: 10
+      RETRY_INTERVAL: 10s
+      KUBECONFIG: /root/.kube/config
+    volumes:
+      - ~/.kube:/root/.kube:ro
+      - ~/.minikube:/home/imad/.minikube:ro
+    depends_on:
+      mc-client:
+        condition: service_started
+      redis-transcode:
+        condition: service_started
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - vod-network
+      - minikube-network
+
+  videos:
+    build:
+      context: ./videos/
+    image: simplevod/videos:latest
+    ports:
+      - "8300:8300"
+    environment:
+      PORT: 8300
+      NODE_ENV: development
+      MONGO_URI: mongodb://user:password@mongo:27017/upload?authSource=admin
+      JWT_SECRET: 5d039bfd062bd2490f0fbd6d46e324d0caa95ea89807e1c73b0b96e8caa2f6c2
+      JWT_EXPIRE: 30d
+      STREAM_BASE_URL: http://minio:9000/stream
+      THUMBNAIL_BASE_URL: http://minio:9000/thumbnails
+      MINIO_ENDPOINT: http://minio:9000
+      MINIO_ACCESS_KEY: minio
+      MINIO_SECRET_KEY: minio123
+    depends_on:
+      - mongo
+      - mc-client
+      - redis-transcode
+      - rabbitmq
+    networks:
+      - vod-network
+
+  finalizer:
+    build:
+      context: ./finalizer/
+    command: python main.py
+    image: simplevod/finalizer:latest
+    environment:
+      MONGO_URL: mongodb://user:password@mongo:27017
+      MONGO_DB_NAME: upload
+      REDIS_HOST: redis-transcode
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: password
+      REDIS_DB: 0
+      MINIO_ENDPOINT: minio:9000
+      MINIO_STREAM_BUCKET: stream
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: 5672
+      RABBITMQ_VHOST: transcode
+      RABBITMQ_USER: transcode
+      RABBITMQ_PASSWORD: password
+      RABBITMQ_CONSUME_QUEUE: finish
+    depends_on:
+      - mongo
+      - mc-client
+      - redis-transcode
+      - rabbitmq
+    networks:
+      - vod-network
+
+  transcode:
+    build:
+      context: ./transcode/
+    image: simplevod/transcode:latest
+
+networks:
+  vod-network:
+    driver: bridge
+  minikube-network:
+    external: true
+    name: minikube

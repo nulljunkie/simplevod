@@ -1,0 +1,137 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "users.fullname" . }}-celery
+  labels:
+    {{- include "celery.labels" . | nindent 4 }}
+spec:
+  {{- if not .Values.celeryWorker.autoscaling.enabled }}
+  replicas: {{ .Values.celeryWorker.replicas }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "celery.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      {{- with .Values.celeryWorker.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        {{- include "celery.labels" . | nindent 8 }}
+        {{- with .Values.celeryWorker.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      {{- with .Values.celeryWorker.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "users.serviceAccountName" . }}
+      {{- with .Values.celeryWorker.podSecurityContext }}
+      securityContext:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: {{ .Chart.Name }}
+          {{- with .Values.celeryWorker.securityContext }}
+          securityContext:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          image: "{{ .Values.celeryWorker.image.repository }}:{{ .Values.celeryWorker.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.celeryWorker.image.pullPolicy }}
+          {{- if .Values.celeryWorker.command }}
+          command:
+            {{- range .Values.celeryWorker.command }}
+            - {{ . | quote }}
+            {{- end }}
+          {{- end }}
+          {{- if .Values.celeryWorker.args }}
+          args:
+            {{- range .Values.celeryWorker.args }}
+            - {{ . | quote }}
+            {{- end }}
+          {{- end }}
+          ports:
+            - name: grpc
+              containerPort: {{ include "users.port" . }}
+              protocol: TCP
+            - name: health
+              containerPort: 8084
+              protocol: TCP
+          env:
+            - name: GRPC_SERVER_PORT
+              value: {{ include "users.port" . | quote }}
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "users.fullname" . }}
+                  key: database_url
+            - name: CELERY_BROKER_URL
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "users.fullname" . }}
+                  key: celery_broker_url
+            - name: CELERY_BACKEND_URL
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "users.fullname" . }}
+                  key: celery_backend_url
+            - name: EMAIL_ADDRESS
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "users.fullname" . }}
+                  key: email_address
+            - name: EMAIL_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "users.fullname" . }}
+                  key: email_password
+            - name: EMAIL_SERVER_NAME
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "users.fullname" . }}
+                  key: email_server_name
+            - name: EMAIL_SERVER_PORT
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "users.fullname" . }}
+                  key: email_server_port
+          {{- with .Values.celeryWorker.livenessProbe }}
+          livenessProbe:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.celeryWorker.readinessProbe }}
+          readinessProbe:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.celeryWorker.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.celeryWorker.volumeMounts }}
+          volumeMounts:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      {{- with .Values.celeryWorker.volumes }}
+      volumes:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      volumes:
+        - name: tmp
+          emptyDir: {}
+      {{- with .Values.celeryWorker.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.celeryWorker.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.celeryWorker.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
