@@ -33,7 +33,11 @@ minikube start --driver=docker --cpus=4 --memory=8g --disk-size=30g \
 eval $(minikube -p minikube docker-env)
 
 docker compose build
+```
 
+Create a `value-override.yaml` similar to `values-override.example.yaml` with your Email address and password
+
+```bash
 helm upgrade --install simplevod helm/app -f helm/app/values-override.yaml
 ```
 
