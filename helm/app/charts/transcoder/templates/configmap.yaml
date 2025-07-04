@@ -5,7 +5,8 @@ metadata:
   labels:
     {{- include "transcoder.labels" . | nindent 4 }}
 data:
-  minio_endpoint: {{ printf "%s-%s.%s:9000" .Release.Name .Values.global.minio.nameOverride .Release.Namespace | quote }}
+  # minio_endpoint: {{ printf "%s-%s.%s:9000" .Release.Name .Values.global.minio.nameOverride .Release.Namespace | quote }}
+  minio_endpoint: {{ .Values.minio.endpoint | quote }}
   minio_use_ssl: {{ .Values.minio.use_ssl | quote }}
   minio_output_bucket: {{ .Values.minio.bucket | quote }}
   mc_alias: {{ .Values.minio.mcAlias | quote }}

@@ -21,6 +21,7 @@ type (
 		Minio      MinioConfig
 		Transcode  TranscodeConfig
 		App        AppConfig
+		Health     HealthConfig
 	}
 
 	RabbitMQConfig struct {
@@ -71,6 +72,10 @@ type (
 		MaxConcurrentHandlers int
 		RetryInterval         time.Duration
 	}
+
+	HealthConfig struct {
+		Port int
+	}
 )
 
 func Load() (*Config, error) {
@@ -88,6 +93,7 @@ func Load() (*Config, error) {
 		Minio:      loadMinioConfig(),
 		Transcode:  transcodeConfig,
 		App:        loadAppConfig(),
+		Health:     loadHealthConfig(),
 	}, nil
 }
 
@@ -162,6 +168,12 @@ func loadAppConfig() AppConfig {
 	return AppConfig{
 		MaxConcurrentHandlers: getEnvAsInt("MAX_CONCURRENT_HANDLERS", 10),
 		RetryInterval:         getEnvAsDuration("RETRY_INTERVAL", 10*time.Second),
+	}
+}
+
+func loadHealthConfig() HealthConfig {
+	return HealthConfig{
+		Port: getEnvAsInt("HEALTH_PORT", 8080),
 	}
 }
 

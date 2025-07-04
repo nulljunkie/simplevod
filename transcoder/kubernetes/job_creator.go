@@ -450,6 +450,14 @@ func (c *Client) createWritableMinioConfigVolume() corev1.Volume {
 	}
 }
 
+func (c *Client) IsHealthy(ctx context.Context) bool {
+	if c.kubernetesClientset == nil {
+		return false
+	}
+	_, err := c.kubernetesClientset.Discovery().ServerVersion()
+	return err == nil
+}
+
 func Pointer[T any](v T) *T {
 	return &v
 }

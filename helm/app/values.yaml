@@ -143,9 +143,21 @@ auth:
         secretName: ingress-tls
 
 frontend:
-  upload: 
+  replicaCount: 1
+  image:
+    repository: simplevod/frontend
+    tag: latest
+    pullPolicy: IfNotPresent
+  upload:
     chunkSize: 5
     concurrentChunks: 3
+  resources:
+    limits:
+      cpu: 500m
+      memory: 512Mi
+    requests:
+      cpu: 100m
+      memory: 256Mi
 
 redis_upload:
   nameOverride: redis-upload

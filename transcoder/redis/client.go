@@ -106,6 +106,14 @@ func (c *client) StoreMasterPaylistMetadata(ctx context.Context, videoID string,
 	return nil
 }
 
+func (c *client) HealthCheck(ctx context.Context) error {
+	if c.rdb == nil {
+		return fmt.Errorf("redis client not initialized")
+	}
+	_, err := c.rdb.Ping(ctx).Result()
+	return err
+}
+
 func (c *client) Close() error {
 	if c.rdb != nil {
 		return c.rdb.Close()

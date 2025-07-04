@@ -11,5 +11,6 @@ type RedisClient interface {
 	GetTotalJobsKey(videoID string) string
 	GetCompletedJobsKey(videoID string) string
 	GetMasterPlaylistKey(videoID string) string
+	HealthCheck(ctx context.Context) error
 	Close() error
 }

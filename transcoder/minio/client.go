@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"time"
 	"transcoder/config"
 
 	"github.com/minio/minio-go/v7"
@@ -33,5 +34,17 @@ func (c *Client) EnsureBucketExists(ctx context.Context, bucketName string) erro
 		return fmt.Errorf("failed to check if Minio bucket '%s' exists: %w", bucketName, err)
 	}
 	return nil
+}
+
+func (c *Client) HealthCheck(ctx context.Context) error {
+	if c.minioClient == nil {
+		return fmt.Errorf("minio client not initialized")
+	}
+	
+	ctx, cancel := context.WithTimeout(ctx, 3*time.Second)
+	defer cancel()
+	
+	_, err := c.minioClient.ListBuckets(ctx)
+	return err
 }
 

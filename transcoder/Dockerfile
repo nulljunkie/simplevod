@@ -16,4 +16,6 @@ WORKDIR /app
 
 COPY --from=builder /app/transcoder .
 
+EXPOSE 8080
+
 CMD ["./transcoder"]

@@ -2,13 +2,16 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"os"
 	"os/signal"
 	"sync"
 	"syscall"
+	"time"
 	"transcoder/config"
 	"transcoder/handlers"
+	"transcoder/health"
 	"transcoder/kubernetes"
 	"transcoder/minio"
 	"transcoder/rabbitmq"
@@ -20,6 +23,7 @@ type TranscoderApp struct {
 	kubernetesClient *kubernetes.Client
 	redisClient      redis.RedisClient
 	minioClient      *minio.Client
+	healthServer     *health.Server
 }
 
 func NewTranscoderApp() (*TranscoderApp, error) {
@@ -40,11 +44,17 @@ func NewTranscoderApp() (*TranscoderApp, error) {
 
 	minioClient := createMinioClientSafely(cfg)
 
+	healthServer, err := createHealthServer(cfg, redisClient, k8sClient, minioClient)
+	if err != nil {
+		return nil, err
+	}
+
 	return &TranscoderApp{
 		configuration:    cfg,
 		kubernetesClient: k8sClient,
 		redisClient:      redisClient,
 		minioClient:      minioClient,
+		healthServer:     healthServer,
 	}, nil
 }
 
@@ -57,6 +67,7 @@ func (app *TranscoderApp) Start() {
 
 	messageHandler := app.createMessageHandler()
 	app.startRabbitMQConsumer(messageHandler, workGroup, ctx)
+	app.startHealthServer(workGroup)
 
 	app.waitForShutdownSignal(shutdownSignals)
 	app.initiateGracefulShutdown(cancel, workGroup)
@@ -72,6 +83,17 @@ func (app *TranscoderApp) startRabbitMQConsumer(handler *handlers.MessageHandler
 	log.Println("RabbitMQ consumer started successfully")
 }
 
+func (app *TranscoderApp) startHealthServer(wg *sync.WaitGroup) {
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		if err := app.healthServer.Start(); err != nil {
+			log.Printf("Health server error: %v", err)
+		}
+	}()
+	log.Println("Health server started successfully")
+}
+
 func (app *TranscoderApp) waitForShutdownSignal(signals chan os.Signal) {
 	log.Println("Transcoder service running - waiting for shutdown signal")
 	sig := <-signals
@@ -81,6 +103,14 @@ func (app *TranscoderApp) waitForShutdownSignal(signals chan os.Signal) {
 func (app *TranscoderApp) initiateGracefulShutdown(cancel context.CancelFunc, wg *sync.WaitGroup) {
 	log.Println("Initiating graceful shutdown")
 	cancel()
+	
+	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer shutdownCancel()
+	
+	if err := app.healthServer.Stop(shutdownCtx); err != nil {
+		log.Printf("Health server shutdown error: %v", err)
+	}
+	
 	log.Println("Waiting for active processes to complete")
 	wg.Wait()
 	log.Println("Transcoder service shutdown complete")
@@ -105,6 +135,21 @@ func createMinioClientSafely(cfg *config.Config) *minio.Client {
 		return nil
 	}
 	return minioClient
+}
+
+func createHealthServer(cfg *config.Config, redisClient redis.RedisClient, k8sClient *kubernetes.Client, minioClient *minio.Client) (*health.Server, error) {
+	rabbitMQURL := fmt.Sprintf("amqp://%s:%s@%s:%d/%s",
+		cfg.RabbitMQ.User,
+		cfg.RabbitMQ.Pass,
+		cfg.RabbitMQ.Host,
+		cfg.RabbitMQ.Port,
+		cfg.RabbitMQ.Vhost)
+
+	deps := health.NewDependencies(redisClient, rabbitMQURL, minioClient, k8sClient)
+	checker := health.NewChecker(deps)
+	handler := health.NewHandler(checker)
+	
+	return health.NewServer(cfg.Health.Port, handler), nil
 }
 
 func createCancellableContext() (context.Context, context.CancelFunc) {

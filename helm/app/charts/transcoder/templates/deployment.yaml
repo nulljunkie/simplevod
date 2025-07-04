@@ -44,6 +44,9 @@ spec:
             - name: http
               containerPort: {{ .Values.service.port }}
               protocol: TCP
+            - name: health
+              containerPort: {{ .Values.health.port }}
+              protocol: TCP
           env:
 
 
@@ -211,7 +214,8 @@ spec:
             - name: "ALLOW_HTTP_JOB_ARG"
               value: {{ .Values.transcode.allowHttp | quote }}
  
-
+            - name: HEALTH_PORT
+              value: {{ .Values.health.port | quote }}
 
 
 
