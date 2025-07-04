@@ -185,10 +185,10 @@ services:
       - DATABASE_URL=postgresql://user:password@postgres-users:5432/users_db
       - CELERY_BROKER_URL=redis://:password@redis-users:6379/1
       - CELERY_BACKEND_URL=redis://:password@redis-users:6379/1
-      - EMAIL_ADDRESS=ltocode36@gmail.com
+      - EMAIL_ADDRESS=example@gmail.com
       - EMAIL_SERVER_NAME=smtp.gmail.com
       - EMAIL_SERVER_PORT=465
-      - EMAIL_PASSWORD=wpqboluywphmuvsx
+      - EMAIL_PASSWORD=xxxxxxxxxxxxxxxx
     volumes:
       - ./users:/app
     depends_on:
