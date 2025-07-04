@@ -3,9 +3,9 @@ replicaCount: 1
 debug: false
 
 image:
-  repository: vod-auth
+  repository: simplevod/auth
   pullPolicy: IfNotPresent
-  tag: "1.0.0"
+  tag: latest
 
 imagePullSecrets: []
 

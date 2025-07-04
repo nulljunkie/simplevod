@@ -360,6 +360,23 @@ minio:
   metrics:
     enabled: true
   
+  initContainers:
+    - name: wait-for-rabbitmq
+      image: busybox:latest
+      command: ['sh', '-c']
+      args:
+        - |
+          echo "Waiting for RabbitMQ to be ready..."
+          until nc -z $RABBITMQ_HOST $RABBITMQ_PORT; do
+            echo "RabbitMQ not ready, waiting 5 seconds..."
+            sleep 5
+          done
+          echo "RabbitMQ is ready!"
+      env:
+        - name: RABBITMQ_HOST
+          value: "simplevod-rabbitmq"
+        - name: RABBITMQ_PORT
+          value: "5672"
   
   containerPorts:
     api: 9000
@@ -459,12 +476,15 @@ upload:
 rabbitmq:
   nameOverride: rabbitmq
   auth:
-    username: user
-    password: password
+    username: admin
+    password: admin123
+    existingPasswordSecret: ""
   plugins: "rabbitmq_management rabbitmq_peer_discovery_k8s"
   extraPlugins: "rabbitmq_auth_backend_ldap prometheus"
-  clustering:
+  memoryHighWatermark:
     enabled: true
+    type: "relative"
+    value: 0.8  # 80%
   extraSecrets:
     load-definition:
       load_definition.json: |
@@ -477,21 +497,15 @@ rabbitmq:
           ],
           "users": [
             {
-              "name": "admin",
-              "password_hash": "h8xIo0Ifyk0DYLgyu/ofbCW9QbzqMES3phlPONznSfX97o91",
-              "hashing_algorithm": "rabbit_password_hashing_sha256",
-              "tags": [
-                "administrator"
-              ],
+              "name": "{{ .Values.auth.username }}",
+              "password": "{{ .Values.auth.password }}",
+              "tags": ["administrator"],
               "limits": {}
             },
             {
               "name": "transcode",
-              "password_hash": "h8xIo0Ifyk0DYLgyu/ofbCW9QbzqMES3phlPONznSfX97o91",
-              "hashing_algorithm": "rabbit_password_hashing_sha256",
-              "tags": [
-                "management"
-              ],
+              "password": "password",
+              "tags": ["management"],
               "limits": {}
             }
           ],
@@ -600,20 +614,22 @@ rabbitmq:
     existingSecret: load-definition
   extraConfiguration: |
     load_definitions = /app/load_definition.json
-  containerPorts:
-    amqp: 5672
-    amqpTls: 5671
-    dist: 25672
-    manager: 15672
-    epmd: 4369
-    metrics: 9419
-  replicaCount: 1
-  resourcesPreset: "small"
+
+  metrics:
+    enabled: true
+
+  resources:
+    requests:
+      cpu: 500m
+      memory: 512Mi
+    limits:
+      cpu: 1000m
+      memory: 1024Mi
+
   persistence:
     enabled: true
-    size: 1Gi
-  metrics:
-    enabled: false
+    size: 2Gi
+
 
 iframebreaker:
   nameOverride: iframebreaker 

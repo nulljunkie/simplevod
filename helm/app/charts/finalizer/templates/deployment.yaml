@@ -32,6 +32,29 @@ spec:
       securityContext:
         {{- toYaml . | nindent 8 }}
       {{- end }}
+      initContainers:
+        - name: wait-for-rabbitmq
+          image: busybox:latest
+          command: ['sh', '-c']
+          args:
+            - |
+              echo "Waiting for RabbitMQ to be ready..."
+              until nc -z $RABBITMQ_HOST $RABBITMQ_PORT; do
+                echo "RabbitMQ not ready, waiting 5 seconds..."
+                sleep 5
+              done
+              echo "RabbitMQ is ready!"
+          env:
+            - name: RABBITMQ_HOST
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ include "finalizer.fullname" . }}
+                  key: rabbitmq_host
+            - name: RABBITMQ_PORT
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ include "finalizer.fullname" . }}
+                  key: rabbitmq_port
       containers:
         - name: {{ .Chart.Name }}
           {{- with .Values.securityContext }}
