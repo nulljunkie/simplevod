@@ -16,5 +16,3 @@
   - transcoder
   - finalizer
     --> if the subchart's own values.yaml does not define debug: with a value, use the the global from root chart's values.yaml
-
-- [ ] RabbitMQ, I increased pod disruption budget to 2 pods, and replica count to 3 replicas, queues weren't not defined to be ha-queues ?? that's could cause issues?? a client to trying to publish/consume to/from queue on a one of these rabbitmq nodes?? exchanges are global right?? they're available on all the nodes??, review the defintion to be compatible with the clustering!!

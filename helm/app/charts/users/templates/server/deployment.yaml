@@ -32,6 +32,55 @@ spec:
       securityContext:
         {{- toYaml . | nindent 8 }}
       {{- end }}
+      initContainers:
+        - name: wait-for-postgresql
+          image: busybox:latest
+          command: ['sh', '-c']
+          args:
+            - |
+              echo "Waiting for PostgreSQL to be ready..."
+              echo "PostgreSQL host: ${POSTGRESQL_HOST}"
+              echo "PostgreSQL port: ${POSTGRESQL_PORT}"
+              until nc -z $POSTGRESQL_HOST $POSTGRESQL_PORT; do
+                echo "PostgreSQL not ready, waiting 5 seconds..."
+                sleep 5
+              done
+              echo "PostgreSQL is ready!"
+          env:
+            - name: POSTGRESQL_HOST
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ include "users.fullname" . }}
+                  key: postgresql_host
+            - name: POSTGRESQL_PORT
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ include "users.fullname" . }}
+                  key: postgresql_port
+        - name: wait-for-broker
+          image: busybox:latest
+          command: ['sh', '-c']
+          args:
+            - |
+              echo "Waiting for Redis broker to be ready..."
+              echo "Broker host: ${BROKER_HOST}"
+              echo "Broker port: ${BROKER_PORT}"
+              until nc -z $BROKER_HOST $BROKER_PORT; do
+                echo "Redis broker not ready, waiting 5 seconds..."
+                sleep 5
+              done
+              echo "Redis broker is ready!"
+          env:
+            - name: BROKER_HOST
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ include "users.fullname" . }}
+                  key: broker_host
+            - name: BROKER_PORT
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ include "users.fullname" . }}
+                  key: broker_port
       containers:
         - name: {{ .Chart.Name }}
           {{- with .Values.grpcServer.securityContext }}

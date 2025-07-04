@@ -32,6 +32,31 @@ spec:
       securityContext:
         {{- toYaml . | nindent 8 }}
       {{- end }}
+      initContainers:
+        - name: wait-for-grpc-server
+          image: busybox:latest
+          command: ['sh', '-c']
+          args:
+            - |
+              echo "Waiting for gRPC server to be ready..."
+              echo "gRPC host: ${GRPC_HOST}"
+              echo "gRPC port: ${GRPC_PORT}"
+              until nc -z $GRPC_HOST $GRPC_PORT; do
+                echo "gRPC server not ready, waiting 5 seconds..."
+                sleep 5
+              done
+              echo "gRPC server is ready!"
+          env:
+            - name: GRPC_HOST
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ include "auth.fullname" . }}
+                  key: grpc_server_host
+            - name: GRPC_PORT
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ include "auth.fullname" . }}
+                  key: grpc_server_port
       containers:
         - name: {{ .Chart.Name }}
           {{- with .Values.securityContext }}

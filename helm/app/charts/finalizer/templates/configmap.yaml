@@ -8,6 +8,7 @@ data:
   minio_endpoint: {{ printf "%s-%s.%s:9000" .Release.Name .Values.global.minio.nameOverride .Release.Namespace | quote }}
   minio_stream_bucket: {{ .Values.minio.bucket | quote }}
 
+  mongo_host: {{ printf "%s-%s.%s" .Release.Name .Values.global.mongodb.nameOverride .Release.Namespace | quote }}
   mongo_db_name: {{ .Values.mongodb.database | quote }}
 
   rabbitmq_host: {{ printf "%s-%s.%s" .Release.Name .Values.global.rabbitmq.nameOverride .Release.Namespace | quote }}

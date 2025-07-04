@@ -101,3 +101,16 @@ volumeMounts: []
 nodeSelector: {}
 tolerations: []
 affinity: {}
+
+# MongoDB configuration
+mongodb:
+  username: root
+  password: rootpassword
+  host: ""
+  port: 27017
+  database: upload
+  authSource: admin
+
+# Optional: reference to existing ConfigMap and Secret
+existingConfigmap: ""
+existingSecret: ""

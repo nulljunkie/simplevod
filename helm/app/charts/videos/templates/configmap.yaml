@@ -1,0 +1,10 @@
+{{- if not .Values.existingConfigmap }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "videos.fullname" . }}
+  labels:
+    {{- include "videos.labels" . | nindent 4 }}
+data:
+  mongo_host: {{ printf "%s-%s.%s" .Release.Name .Values.global.mongodb.nameOverride .Release.Namespace | quote }}
+{{- end }}

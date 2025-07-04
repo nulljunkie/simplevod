@@ -33,12 +33,82 @@ spec:
         {{- toYaml . | nindent 8 }}
       {{- end }}
       initContainers:
+        # - name: wait-for-minio
+        #   image: busybox:latest
+        #   command: ['sh', '-c']
+        #   args:
+        #     - |
+        #       echo "Waiting for MinIO to be ready..."
+        #       # Extract host and port from MINIO_ENDPOINT
+        #       MINIO_HOST_PORT=$(echo $MINIO_ENDPOINT | sed 's|.*://||')
+        #       if echo $MINIO_HOST_PORT | grep -q ':'; then
+        #         MINIO_HOST=$(echo $MINIO_HOST_PORT | cut -d':' -f1)
+        #         MINIO_PORT=$(echo $MINIO_HOST_PORT | cut -d':' -f2)
+        #       else
+        #         MINIO_HOST=$MINIO_HOST_PORT
+        #         MINIO_PORT=80
+        #       fi
+        #       echo "Minio host: ${MINIO_HOST}"
+        #       echo "Minio Port: ${MINIO_PORT}"
+        #       until nc -z $MINIO_HOST $MINIO_PORT; do
+        #         echo "MinIO not ready, waiting 5 seconds..."
+        #         sleep 5
+        #       done
+        #       echo "MinIO is ready!"
+        #   env:
+        #     - name: MINIO_ENDPOINT
+        #       valueFrom:
+        #         configMapKeyRef:
+        #           name: {{ include "finalizer.fullname" . }}
+        #           key: minio_endpoint
+        - name: wait-for-mongodb
+          image: busybox:latest
+          command: ['sh', '-c']
+          args:
+            - |
+              echo "Waiting for MongoDB to be ready..."
+              MONGO_PORT=27017
+              echo "Mongo host: ${MINIO_HOST}"
+              echo "Mongo Port: ${MINIO_PORT}"
+              until nc -z $MONGO_HOST $MONGO_PORT; do
+                echo "MongoDB not ready, waiting 5 seconds..."
+                sleep 5
+              done
+              echo "MongoDB is ready!"
+          env:
+            - name: MONGO_HOST
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ include "finalizer.fullname" . }}
+                  key: mongo_host
+        - name: wait-for-redis
+          image: busybox:latest
+          command: ['sh', '-c']
+          args:
+            - |
+              echo "Waiting for Redis to be ready..."
+              REDIS_PORT=6379
+              echo "Redis host: ${REDIS_HOST}"
+              echo "Redis Port: ${REDIS_PORT}"
+              until nc -z $REDIS_HOST 6379; do
+                echo "Redis not ready, waiting 5 seconds..."
+                sleep 5
+              done
+              echo "Redis is ready!"
+          env:
+            - name: REDIS_HOST
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ include "finalizer.fullname" . }}
+                  key: redis_host
         - name: wait-for-rabbitmq
           image: busybox:latest
           command: ['sh', '-c']
           args:
             - |
               echo "Waiting for RabbitMQ to be ready..."
+              echo "RabbitMQ host: ${RABBITMQ_HOST}"
+              echo "RabbitMQ Port: ${RABBITMQ_PORT}"
               until nc -z $RABBITMQ_HOST $RABBITMQ_PORT; do
                 echo "RabbitMQ not ready, waiting 5 seconds..."
                 sleep 5

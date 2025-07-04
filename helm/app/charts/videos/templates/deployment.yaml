@@ -32,6 +32,32 @@ spec:
       securityContext:
         {{- toYaml . | nindent 8 }}
       {{- end }}
+      initContainers:
+        - name: wait-for-mongodb
+          image: busybox:latest
+          command: ['sh', '-c']
+          args:
+            - |
+              echo "Waiting for MongoDB to be ready..."
+              echo "Mongo host: ${MONGO_HOST}"
+              echo "Mongo port: ${MONGO_PORT}"
+              until nc -z $MONGO_HOST $MONGO_PORT; do
+                echo "MongoDB not ready, waiting 5 seconds..."
+                sleep 5
+              done
+              echo "MongoDB is ready!"
+          env:
+            - name: MONGO_HOST
+              valueFrom:
+                configMapKeyRef:
+                  {{- if .Values.existingConfigmap }}
+                  name: {{ .Values.existingConfigmap }}
+                  {{- else }}
+                  name: {{ include "videos.fullname" . }}
+                  {{- end }}
+                  key: mongo_host
+            - name: MONGO_PORT
+              value: "27017"
       containers:
         - name: {{ .Chart.Name }}
           {{- with .Values.securityContext }}
@@ -61,7 +87,14 @@ spec:
             - name: NODE_ENV
               value: production
             - name: MONGO_URI
-              value: {{ printf "mongodb://root:rootpassword@%s:27017/upload?authSource=admin" (printf "%s-%s.%s" .Release.Name .Values.global.mongodb.nameOverride .Release.Namespace) | quote }}
+              valueFrom:
+                secretKeyRef:
+                  {{- if .Values.existingSecret }}
+                  name: {{ .Values.existingSecret }}
+                  {{- else }}
+                  name: {{ include "videos.fullname" . }}
+                  {{- end }}
+                  key: mongo_url
             - name: JWT_SECRET
               value: {{ .Values.global.jwtAuth.secret | quote }}
             - name: JWT_EXPIRE
