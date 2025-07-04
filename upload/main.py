@@ -13,12 +13,21 @@ from models.models import StoredVideo
 async def lifespan(app: FastAPI):
     """Lifespan context manager for startup and shutdown events."""
     logger.info("Initializing database...")
-    client = motor.motor_asyncio.AsyncIOMotorClient(mongo_config.url)
-    await beanie.init_beanie(
-        database=client[mongo_config.db_name],
-        document_models=[StoredVideo],
-    )
-    logger.info("Database initialized successfully.")
+    try:
+        client = motor.motor_asyncio.AsyncIOMotorClient(
+            mongo_config.url,
+            serverSelectionTimeoutMS=10000,  # 10 second timeout
+            connectTimeoutMS=10000,
+            socketTimeoutMS=10000
+        )
+        await beanie.init_beanie(
+            database=client[mongo_config.db_name],
+            document_models=[StoredVideo],
+        )
+        logger.info("Database initialized successfully.")
+    except Exception as e:
+        logger.error(f"Database initialization failed: {e}")
+        # Don't fail startup, let readiness probe handle it
     yield
     logger.info("Shutting down application...")
 
