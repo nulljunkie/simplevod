@@ -99,7 +99,7 @@ redis_users:
       enabled: true
       size: 1Gi
   metrics:
-    enabled: true
+    enabled: false
 
 users:
   nameOverride: users
@@ -172,7 +172,7 @@ redis_upload:
       enabled: true
       size: 1Gi
   metrics:
-    enabled: true
+    enabled: false
 
 redis_transcode:
   nameOverride: redis-transcode
@@ -185,7 +185,7 @@ redis_transcode:
       enabled: true
       size: 1Gi
   metrics:
-    enabled: true
+    enabled: false
 
 
 minio:
@@ -358,7 +358,7 @@ minio:
           queue_dir: ""
   
   metrics:
-    enabled: true
+    enabled: false
   
   initContainers:
     - name: wait-for-rabbitmq
@@ -431,9 +431,9 @@ mongodb:
     enabled: true
     size: 1Gi
   arbiter:
-    enabled: true
+    enabled: false
   metrics:
-    enabled: true
+    enabled: false
 
 upload: 
   nameOverride: upload
@@ -616,7 +616,7 @@ rabbitmq:
     load_definitions = /app/load_definition.json
 
   metrics:
-    enabled: true
+    enabled: false
 
   resources:
     requests:
