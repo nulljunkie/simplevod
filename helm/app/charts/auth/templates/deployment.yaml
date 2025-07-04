@@ -77,6 +77,8 @@ spec:
                 secretKeyRef:
                   name: {{ include "auth.fullname" . }}
                   key: grpc_server_address
+            - name: LOG_DEBUG
+              value: {{ .Values.debug | default .Values.global.debug | quote }}
           {{- with .Values.livenessProbe }}
           livenessProbe:
             {{- toYaml . | nindent 12 }}

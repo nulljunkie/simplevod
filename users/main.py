@@ -2,6 +2,7 @@ from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, UTC
 import grpc
 import bcrypt
+import os
 from sqlalchemy.exc import IntegrityError
 from users_pb2 import GetUserByEmailResponse, CreateUserResponse, ActivateUserResponse, ResendActivationEmailResponse
 from users_pb2_grpc import UserServiceServicer, add_UserServiceServicer_to_server
@@ -12,6 +13,11 @@ from decouple import config
 import logging
 import threading
 from probe_server import ProbeState, start_probe_server
+
+# Configure logging level based on LOG_DEBUG
+debug_enabled = os.getenv("LOG_DEBUG", "false").lower() == "true"
+log_level = logging.DEBUG if debug_enabled else logging.INFO
+logging.basicConfig(level=log_level, format='%(asctime)s - %(levelname)s - %(message)s')
 
 ACTIVATION_BASE_URL = config("ACTIVATION_BASE_URL", default="http://localhost:3000")
 

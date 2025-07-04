@@ -1,5 +1,7 @@
 replicaCount: 1
 
+debug: false
+
 image:
   repository: simplevod/playlist
   pullPolicy: IfNotPresent

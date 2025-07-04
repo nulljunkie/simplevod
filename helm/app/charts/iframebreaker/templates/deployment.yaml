@@ -167,6 +167,8 @@ spec:
               value: {{ .Values.circuitBreaker.failureThreshold | quote }}
             - name: CIRCUIT_BREAKER_TIMEOUT
               value: {{ .Values.circuitBreaker.timeout | quote }}
+            - name: LOG_DEBUG
+              value: {{ .Values.debug | default .Values.global.debug | quote }}
           {{- with .Values.livenessProbe }}
           livenessProbe:
             {{- toYaml . | nindent 12 }}

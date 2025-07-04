@@ -59,6 +59,10 @@ def setup_logger(name: str = "upload", level: int = logging.INFO) -> logging.Log
     Returns:
         logging.Logger: Configured logger instance.
     """
+    debug_enabled = os.getenv("LOG_DEBUG", "false").lower() == "true"
+    if debug_enabled:
+        level = logging.DEBUG
+    
     logger = logging.getLogger(name)
     logger.setLevel(level)
     if not logger.handlers:  # Prevent duplicate handlers

@@ -12,7 +12,16 @@ app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
-app.use(morgan('dev'));
+const debugEnabled = process.env.LOG_DEBUG === 'true';
+if (debugEnabled) {
+  app.use(morgan('dev'));
+} else {
+  app.use(morgan('dev', {
+    skip: function (req, res) {
+      return req.originalUrl.includes('/health');
+    }
+  }));
+}
 
 // Routes
 app.use('/api', routes);

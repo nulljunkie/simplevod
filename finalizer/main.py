@@ -1,6 +1,7 @@
 import asyncio
 import json
 import logging
+import os
 import signal
 from typing import Optional
 
@@ -11,6 +12,11 @@ from config import config
 from mongo_client import MongoClient
 from rabbitmq_client import RabbitmqClient
 from redis_client import RedisClient
+
+# Configure logging level based on LOG_DEBUG
+debug_enabled = os.getenv("LOG_DEBUG", "false").lower() == "true"
+log_level = logging.DEBUG if debug_enabled else logging.INFO
+logging.basicConfig(level=log_level, format='%(asctime)s - %(levelname)s - %(message)s')
 
 
 class FinalizerService:

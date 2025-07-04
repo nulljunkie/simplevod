@@ -1,4 +1,5 @@
 import logging
+import os
 from typing import Optional
 from aiohttp import web
 from aiohttp.web_runner import AppRunner
@@ -9,6 +10,27 @@ from clients.minio import MinioClient
 from clients.rabbitmq import RabbitMQClient
 
 logger = logging.getLogger(__name__)
+
+@web.middleware
+async def health_logging_middleware(request, handler):
+    """Middleware to filter health check logs based on LOG_DEBUG setting."""
+    debug_enabled = os.getenv("LOG_DEBUG", "false").lower() == "true"
+    
+    # Skip logging for health checks unless debug is enabled
+    if not debug_enabled and request.path.startswith('/health'):
+        return await handler(request)
+    
+    # Log the request if not a health check or debug is enabled
+    start_time = request.loop.time()
+    try:
+        response = await handler(request)
+        process_time = request.loop.time() - start_time
+        logger.info(f"{request.remote} {request.method} {request.path} {response.status} {process_time:.3f}s")
+        return response
+    except Exception as ex:
+        process_time = request.loop.time() - start_time
+        logger.error(f"{request.remote} {request.method} {request.path} ERROR {process_time:.3f}s: {ex}")
+        raise
 
 class HealthHandler:
     def __init__(self, health_service: HealthService) -> None:
@@ -78,7 +100,7 @@ def create_health_app(redis_client: RedisClient, minio_client: MinioClient, rabb
     health_service = HealthService(redis_client, minio_client, rabbitmq_client)
     health_handler = HealthHandler(health_service)
     
-    app = web.Application()
+    app = web.Application(middlewares=[health_logging_middleware])
     app.router.add_get('/health', health_handler.handle_health_check)
     app.router.add_get('/health/ready', health_handler.handle_readiness_check)
     app.router.add_get('/health/live', health_handler.handle_liveness_check)

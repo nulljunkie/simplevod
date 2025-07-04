@@ -160,6 +160,8 @@ spec:
                   key: jwt_algorithm
             - name: UVICORN_RELOAD
               value: "false"
+            - name: LOG_DEBUG
+              value: {{ .Values.debug | default .Values.global.debug | quote }}
           {{- with .Values.livenessProbe }}
           livenessProbe:
             {{- toYaml . | nindent 12 }}

@@ -1,4 +1,6 @@
 global: 
+  debug: false  # Set to true for verbose logging including health checks
+  
   jwtAuth:
     secret: supersecurejwtsecretkey
     algorithm: HS256

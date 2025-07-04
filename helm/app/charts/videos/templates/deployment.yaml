@@ -76,6 +76,8 @@ spec:
               value: admin
             - name: MINIO_SECRET_KEY
               value: admin123
+            - name: LOG_DEBUG
+              value: {{ .Values.debug | default .Values.global.debug | quote }}
 
 
 

@@ -3,6 +3,11 @@ const logger = (req, res, next) => {
   const start = new Date();
 
   res.on('finish', () => {
+    const debugEnabled = process.env.LOG_DEBUG === 'true';
+    if (!debugEnabled && req.originalUrl.includes('/health')) {
+      return;
+    }
+
     const timestamp = start.toLocaleString('en-US', {
       day: '2-digit',
       month: 'short',

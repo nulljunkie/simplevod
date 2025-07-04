@@ -97,6 +97,8 @@ spec:
                 secretKeyRef:
                   name: {{ include "users.fullname" . }}
                   key: email_server_port
+            - name: LOG_DEBUG
+              value: {{ .Values.debug | default .Values.global.debug | quote }}
           {{- with .Values.celeryWorker.livenessProbe }}
           livenessProbe:
             {{- toYaml . | nindent 12 }}

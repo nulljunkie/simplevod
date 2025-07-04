@@ -144,6 +144,8 @@ spec:
             - name: HEALTH_PORT
               value: {{ .Values.healthCheck.port | quote }}
             {{- end }}
+            - name: LOG_DEBUG
+              value: {{ .Values.debug | default .Values.global.debug | quote }}
           {{- if .Values.healthCheck.enabled }}
           {{- with .Values.startupProbe }}
           startupProbe:

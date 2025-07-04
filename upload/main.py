@@ -1,4 +1,5 @@
 import os
+import logging
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -31,6 +32,18 @@ async def lifespan(app: FastAPI):
     yield
     logger.info("Shutting down application...")
 
+class HealthCheckFilter(logging.Filter):
+    """Filter out health check requests from logs when debug is disabled."""
+    def filter(self, record):
+        debug_enabled = os.getenv("LOG_DEBUG", "false").lower() == "true"
+        if debug_enabled:
+            return True
+        if hasattr(record, 'getMessage'):
+            message = record.getMessage()
+            if "/health/" in message or "GET /health" in message:
+                return False
+        return True
+
 def create_app() -> FastAPI:
     """Create and configure the FastAPI application."""
     app = FastAPI(title="Upload Service", lifespan=lifespan)
@@ -42,6 +55,10 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
     )
     app.include_router(router)
+    
+    uvicorn_access = logging.getLogger("uvicorn.access")
+    uvicorn_access.addFilter(HealthCheckFilter())
+    
     logger.info("FastAPI application initialized")
     return app
 

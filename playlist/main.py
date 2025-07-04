@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import os
 import signal
 from typing import Optional
 from config import get_rabbitmq_config, get_redis_config, get_minio_config, get_health_port
@@ -10,7 +11,9 @@ from services.playlist import PlaylistService
 from handlers.playlist_handler import PlaylistHandler
 from handlers.health_handler import create_health_app, start_health_server, stop_health_server
 
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+debug_enabled = os.getenv("LOG_DEBUG", "false").lower() == "true"
+log_level = logging.DEBUG if debug_enabled else logging.INFO
+logging.basicConfig(level=log_level, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
 class PlaylistApp:

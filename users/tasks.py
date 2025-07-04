@@ -1,6 +1,7 @@
 from email.mime.text import MIMEText
 from celery import Celery
 import smtplib
+import os
 from decouple import config
 import logging
 from tenacity import retry, stop_after_attempt, wait_fixed
@@ -14,7 +15,9 @@ EMAIL_SERVER_NAME = config('EMAIL_SERVER_NAME')
 EMAIL_SERVER_PORT = config('EMAIL_SERVER_PORT', cast=int)
 EMAIL_PASSWORD = config("EMAIL_PASSWORD")
 
-logging.basicConfig(level=logging.INFO)
+debug_enabled = os.getenv("LOG_DEBUG", "false").lower() == "true"
+log_level = logging.DEBUG if debug_enabled else logging.INFO
+logging.basicConfig(level=log_level, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
 @retry(stop=stop_after_attempt(5), wait=wait_fixed(2))
