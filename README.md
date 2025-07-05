@@ -6,7 +6,7 @@ A Kubernative-native distributed video transcoding platform built for scale.
 
 #### The Backend
 
-![Backend Architecture](images/Architecture.png)
+![Backend Architecture](images/Architecture.jpg)
 
 - **Auth**: Node.js/Express authentication service
 - **Users**: Python gRPC service for user management with Celery for background tasks (e.g. Sending account activation emails)
