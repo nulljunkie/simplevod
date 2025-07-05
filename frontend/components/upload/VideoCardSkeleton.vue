@@ -7,7 +7,7 @@
       </div>
 
       <!-- Video Details Skeleton -->
-      <div class="flex-1 space-y-4">
+      <div class="flex-1 space-y-2">
         <!-- Title with Edit Icon -->
         <div class="flex items-center space-x-2">
           <div class="h-6 bg-primary-skeleton rounded w-64"></div>

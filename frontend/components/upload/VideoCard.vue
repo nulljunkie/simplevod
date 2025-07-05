@@ -12,7 +12,7 @@
       </div>
 
       <!-- Video Details -->
-      <div class="flex-1 space-y-4">
+      <div class="flex-1 space-y-2">
         <!-- Title with Edit Icon -->
         <div class="flex items-center space-x-2">
           <h3 class="text-lg font-semibold text-primary-smoke" :title="video.title">
@@ -34,7 +34,7 @@
             <span class="text-primary-silver">filename: </span>
             <span class="text-primary-smoke">{{ video.original_filename || 'video.mp4' }}</span>
           </div>
-          <div>
+          <div class="flex items-center space-x-2">
             <span class="text-primary-silver">status: </span>
             <StatusBadge :status="videoStatus" />
           </div>
@@ -59,18 +59,20 @@
             <label class="flex items-center space-x-2 cursor-pointer">
               <input 
                 type="radio" 
+                :name="`visibility-${video.id}`"
                 :checked="video.visibility === 'public'"
                 @change="updateVisibility('public')"
-                class="w-4 h-4"
+                class="w-4 h-4 text-primary-red bg-primary-silver border-primary-silver focus:ring-primary-red focus:ring-2"
               />
               <span class="text-sm text-primary-smoke">Public</span>
             </label>
             <label class="flex items-center space-x-2 cursor-pointer">
               <input 
                 type="radio" 
+                :name="`visibility-${video.id}`"
                 :checked="video.visibility === 'private'"
                 @change="updateVisibility('private')"
-                class="w-4 h-4"
+                class="w-4 h-4 text-primary-red bg-primary-silver border-primary-silver focus:ring-primary-red focus:ring-2"
               />
               <span class="text-sm text-primary-smoke">Private</span>
             </label>
@@ -90,9 +92,9 @@
               <EditIcon class="w-3 h-3 text-primary-silver" />
             </button>
           </div>
-          <p class="text-sm text-primary-smoke leading-relaxed">
+          <p class="text-sm text-primary-smoke/90 leading-relaxed">
             {{ video.description || 'No description provided' }}
-            <button v-if="video.description && video.description.length > 100" class="text-primary-blue ml-1">
+            <button v-if="video.description && video.description.length > 100" class="text-primary-silver ml-1">
               more
             </button>
           </p>
@@ -104,10 +106,10 @@
         <button
           v-if="canDelete"
           @click="$emit('delete', video)"
-          class="p-2 hover:bg-primary-gray rounded"
+          class="p-2 group hover:bg-primary-error/20 rounded-full"
           title="Delete video"
         >
-          <TrashIcon class="w-5 h-5 text-primary-silver hover:text-primary-red" />
+          <TrashIcon class="w-5 h-5 text-primary-silver group-hover:text-primary-red" />
         </button>
       </div>
     </div>
