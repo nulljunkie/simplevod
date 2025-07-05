@@ -122,7 +122,8 @@ spec:
               containerPort: {{ .Values.health.port }}
               protocol: TCP
           env:
-
+            - name: LOG_DEBUG
+              value: {{ .Values.debug | default .Values.global.debug | quote }}
 
             - name: MINIO_ENDPOINT
               valueFrom:

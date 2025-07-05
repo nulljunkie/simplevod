@@ -14,10 +14,10 @@ import logging
 import threading
 from probe_server import ProbeState, start_probe_server
 
-# Configure logging level based on LOG_DEBUG
 debug_enabled = os.getenv("LOG_DEBUG", "false").lower() == "true"
 log_level = logging.DEBUG if debug_enabled else logging.INFO
 logging.basicConfig(level=log_level, format='%(asctime)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
 
 ACTIVATION_BASE_URL = config("ACTIVATION_BASE_URL", default="http://localhost:3000")
 
@@ -173,20 +173,15 @@ class UserService(UserServiceServicer):
             logger.info(f"Activation email resent to: {request.email}")
             context.set_code(grpc.StatusCode.OK)
             return ResendActivationEmailResponse(message="Activation email resent successfully")
-                
 
 def serve():
     server = grpc.server(ThreadPoolExecutor(max_workers=10))
     add_UserServiceServicer_to_server(UserService(), server)
     server.add_insecure_port("[::]:50051")
     server.start()
-    ProbeState.readiness = True  # Mark as ready when gRPC server is started
+    ProbeState.readiness = True
     print("Users gRPC server running on port 50051")
     server.wait_for_termination()
-
-
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
 
 if __name__ == "__main__":
     start_probe_server(port=8082)

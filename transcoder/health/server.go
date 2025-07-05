@@ -5,12 +5,44 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"os"
+	"strings"
 	"time"
 )
 
 type Server struct {
 	server  *http.Server
 	handler *Handler
+}
+
+// responseWriter wraps http.ResponseWriter to capture status code
+type responseWriter struct {
+	http.ResponseWriter
+	statusCode int
+}
+
+func (rw *responseWriter) WriteHeader(code int) {
+	rw.statusCode = code
+	rw.ResponseWriter.WriteHeader(code)
+}
+
+func HealthLoggingMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		debugEnabled := strings.ToLower(os.Getenv("LOG_DEBUG")) == "true"
+
+		if !debugEnabled && strings.HasPrefix(r.URL.Path, "/health") {
+			next.ServeHTTP(w, r)
+			return
+		}
+
+		start := time.Now()
+
+		rw := &responseWriter{ResponseWriter: w, statusCode: 200}
+		next.ServeHTTP(rw, r)
+
+		duration := time.Since(start)
+		log.Printf("%s %s %d %v", r.Method, r.URL.Path, rw.statusCode, duration)
+	})
 }
 
 func NewServer(port int, handler *Handler) *Server {
@@ -20,7 +52,7 @@ func NewServer(port int, handler *Handler) *Server {
 
 	server := &http.Server{
 		Addr:         fmt.Sprintf(":%d", port),
-		Handler:      mux,
+		Handler:      HealthLoggingMiddleware(mux),
 		ReadTimeout:  10 * time.Second,
 		WriteTimeout: 10 * time.Second,
 		IdleTimeout:  30 * time.Second,

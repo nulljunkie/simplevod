@@ -1,5 +1,6 @@
 import logging
 import json
+import os
 import signal
 import sys
 import threading
@@ -16,6 +17,11 @@ class HealthCheckHandler(BaseHTTPRequestHandler):
     def __init__(self, *args, health_checker=None, **kwargs):
         self.health_checker = health_checker
         super().__init__(*args, **kwargs)
+    
+    def log_message(self, format, *args):
+        debug_enabled = os.getenv("LOG_DEBUG", "false").lower() == "true"
+        if debug_enabled:
+            super().log_message(format, *args)
     
     def do_GET(self):
         if self.path == '/health':

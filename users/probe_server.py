@@ -1,4 +1,5 @@
 import threading
+import os
 from http.server import BaseHTTPRequestHandler, HTTPServer
 
 class ProbeState:
@@ -6,6 +7,11 @@ class ProbeState:
     readiness = False
 
 class ProbeHandler(BaseHTTPRequestHandler):
+    def log_message(self, format, *args):
+        debug_enabled = os.getenv("LOG_DEBUG", "false").lower() == "true"
+        if debug_enabled:
+            super().log_message(format, *args)
+    
     def do_GET(self):
         if self.path == "/healthz":
             if ProbeState.liveness:

@@ -136,6 +136,8 @@ transcode:
     exchange: video
     routingKey: video.playlist
 
+debug: false
+
 config: 
   maxConcurrentHandlers: 10
   retryInterval: 10s

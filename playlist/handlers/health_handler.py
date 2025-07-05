@@ -112,7 +112,11 @@ async def start_health_server(app: web.Application, port: int) -> AppRunner:
     Starts HTTP server for health check endpoints.
     Returns runner for graceful shutdown management.
     """
-    runner = AppRunner(app)
+    # Disable aiohttp's built-in access logging for health endpoints when debug is disabled
+    debug_enabled = os.getenv("LOG_DEBUG", "false").lower() == "true"
+    access_log = None if not debug_enabled else logging.getLogger('aiohttp.access')
+    
+    runner = AppRunner(app, access_log=access_log)
     await runner.setup()
     
     site = web.TCPSite(runner, '0.0.0.0', port)

@@ -13,7 +13,6 @@ from mongo_client import MongoClient
 from rabbitmq_client import RabbitmqClient
 from redis_client import RedisClient
 
-# Configure logging level based on LOG_DEBUG
 debug_enabled = os.getenv("LOG_DEBUG", "false").lower() == "true"
 log_level = logging.DEBUG if debug_enabled else logging.INFO
 logging.basicConfig(level=log_level, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -51,7 +50,17 @@ class FinalizerService:
             await message.nack(requeue=True)
 
     async def setup_health_endpoints(self):
-        app = web.Application()
+        # Health check logging middleware
+        @web.middleware
+        async def health_logging_middleware(request, handler):
+            # Only log health check requests when LOG_DEBUG is enabled
+            debug_enabled = os.getenv("LOG_DEBUG", "false").lower() == "true"
+            if not debug_enabled and request.path.startswith('/health'):
+                # Skip logging for health checks when debug is disabled
+                return await handler(request)
+            return await handler(request)
+        
+        app = web.Application(middlewares=[health_logging_middleware])
         
         async def liveness_probe(request):
             return web.Response(text="OK", status=200)
@@ -71,7 +80,11 @@ class FinalizerService:
         app.router.add_get('/health/live', liveness_probe)
         app.router.add_get('/health/ready', readiness_probe)
         
-        runner = web.AppRunner(app)
+        # Disable aiohttp's built-in access logging for health endpoints when debug is disabled
+        debug_enabled = os.getenv("LOG_DEBUG", "false").lower() == "true"
+        access_log = None if not debug_enabled else logging.getLogger('aiohttp.access')
+        
+        runner = web.AppRunner(app, access_log=access_log)
         await runner.setup()
         site = web.TCPSite(runner, '0.0.0.0', config.health_port)
         await site.start()
