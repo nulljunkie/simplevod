@@ -247,7 +247,7 @@ exports.getMyVideos = async (req, res) => {
       .sort(sortObj)
       .skip((page - 1) * limit)
       .limit(Number(limit))
-      .select('unique_key title description thumbnail_urls duration_seconds status visibility views_count likes_count uploaded_at published_at');
+      .select('unique_key title description original_filename thumbnail_urls duration_seconds status visibility views_count likes_count uploaded_at published_at');
 
     logger.info(`Videos returned: ${videos.length}`);
 
@@ -256,6 +256,7 @@ exports.getMyVideos = async (req, res) => {
         id: video.unique_key,
         title: video.title,
         description: video.description,
+        original_filename: video.original_filename,
         thumbnail_url: video.thumbnail_urls?.small,
         duration_seconds: video.duration_seconds,
         status: video.status,

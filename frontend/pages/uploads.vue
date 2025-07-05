@@ -22,9 +22,9 @@
       message="No videos uploaded yet. Upload your first video!"
     />
     
-    <div v-else class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+    <div v-else class="space-y-4">
       <template v-if="videosStore.isLoadingList">
-        <VideoCardSkeleton v-for="n in 12" :key="`skeleton-${n}`" />
+        <VideoCardSkeleton v-for="n in 5" :key="`skeleton-${n}`" />
       </template>
       <template v-else>
         <UploadVideoCard v-for="video in videosStore.videos" :key="video.id" :video="video" />
@@ -41,9 +41,10 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, onUnmounted, watch } from 'vue';
+import { onMounted, onUnmounted, watch, computed, nextTick } from 'vue';
 import { useVideosStore } from '~/stores/videos';
 import { useAuthStore } from '~/stores/auth';
+import { useUploadsStore } from '~/stores/uploads';
 import { useStatusPolling } from '~/composables/useStatusPolling';
 import UploadVideoCard from '~/components/upload/VideoCard.vue';
 import VideoCardSkeleton from '~/components/video/VideoCardSkeleton.vue';
@@ -57,6 +58,7 @@ definePageMeta({
 
 const videosStore = useVideosStore();
 const authStore = useAuthStore();
+const uploadsStore = useUploadsStore();
 const route = useRoute();
 const router = useRouter();
 const { startPolling, stopPolling, getProcessingVideoIds } = useStatusPolling();
@@ -117,5 +119,18 @@ watch(
     }
   },
   { deep: true }
+);
+
+// Watch for completed uploads and refresh the list
+watch(
+  () => uploadsStore.completedUploads.length,
+  (newLength, oldLength) => {
+    if (newLength > oldLength) {
+      // New upload completed, wait a bit then refresh the uploads list
+      setTimeout(() => {
+        fetchUploadsData();
+      }, 2000);
+    }
+  }
 );
 </script>
