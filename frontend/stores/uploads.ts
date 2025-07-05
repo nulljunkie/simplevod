@@ -32,10 +32,23 @@ export const useUploadsStore = defineStore('uploads', () => {
   const uploadService: UploadService = new UploadServiceImpl();
 
   const overallProgress = computed(() => {
-    const uploadsInProgress = state.value.activeUploads.filter(u => ['uploading', 'pending', 'paused'].includes(u.status));
-    if (!uploadsInProgress.length) return 0;
-    const totalProgress = uploadsInProgress.reduce((sum, u) => sum + u.progress, 0);
-    return Math.round(totalProgress / uploadsInProgress.length);
+    const activeUploads = state.value.activeUploads;
+    if (!activeUploads.length) return 0;
+    
+    // Include all uploads that are not failed or cancelled
+    const relevantUploads = activeUploads.filter(u => 
+      !['failed', 'cancelled'].includes(u.status)
+    );
+    
+    if (!relevantUploads.length) return 0;
+    
+    // Calculate progress - completed uploads count as 100%
+    const totalProgress = relevantUploads.reduce((sum, u) => {
+      if (u.status === 'completed') return sum + 100;
+      return sum + u.progress;
+    }, 0);
+    
+    return Math.round(totalProgress / relevantUploads.length);
   });
 
   const hasActiveUploads = computed(() =>
@@ -253,7 +266,7 @@ export const useUploadsStore = defineStore('uploads', () => {
       setTimeout(() => {
         console.log(`[CompleteUpload] Removing upload ${uploadId}`);
         state.value.activeUploads = state.value.activeUploads.filter(u => u.id !== uploadId);
-      }, 5000);
+      }, 3000);
     } catch (error: any) {
       upload.status = 'failed';
       upload.errorMessage = error.message || 'Failed to finalize upload.';

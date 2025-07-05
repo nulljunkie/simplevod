@@ -21,6 +21,7 @@ export interface UploadFile {
   chunksQueue: ChunkJob[];
   uploadedChunkSizes: number[];
   etags: { partNumber: number; etag: string }[];
+  presignedUrls?: Map<number, string>;
   errorMessage?: string;
   controller?: AbortController;
 }

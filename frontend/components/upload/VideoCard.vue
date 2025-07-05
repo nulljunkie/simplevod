@@ -1,5 +1,5 @@
 <template>
-  <div class="bg-primary-gray-dark border border-primary-gray rounded-lg p-6">
+  <div class="bg-primary-dark border border-primary-gray rounded-lg p-6">
     <div class="flex items-start space-x-6">
       <!-- Thumbnail -->
       <div class="flex-shrink-0">

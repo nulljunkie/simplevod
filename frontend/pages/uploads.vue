@@ -24,7 +24,7 @@
     
     <div v-else class="space-y-4">
       <template v-if="videosStore.isLoadingList">
-        <VideoCardSkeleton v-for="n in 5" :key="`skeleton-${n}`" />
+        <UploadVideoCardSkeleton v-for="n in 5" :key="`skeleton-${n}`" />
       </template>
       <template v-else>
         <UploadVideoCard v-for="video in videosStore.videos" :key="video.id" :video="video" />
@@ -47,7 +47,7 @@ import { useAuthStore } from '~/stores/auth';
 import { useUploadsStore } from '~/stores/uploads';
 import { useStatusPolling } from '~/composables/useStatusPolling';
 import UploadVideoCard from '~/components/upload/VideoCard.vue';
-import VideoCardSkeleton from '~/components/video/VideoCardSkeleton.vue';
+import UploadVideoCardSkeleton from '~/components/upload/VideoCardSkeleton.vue';
 import ErrorState from '~/components/ui/ErrorState.vue';
 import EmptyState from '~/components/ui/EmptyState.vue';
 import Pagination from '~/components/ui/Pagination.vue';
