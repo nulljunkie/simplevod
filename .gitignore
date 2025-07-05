@@ -94,6 +94,8 @@ ehthumbs.db
 Desktop.ini
 
 *.tar.gz
+*.tar
+*.tgz
 *.zip
 *.rar
 
