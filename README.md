@@ -21,7 +21,7 @@ A Kubernative-native distributed video transcoding platform built for scale.
 
 - **Frontend** (Nuxt.js 3):
   - **Adaptive Video Streaming**: HLS.js integration with automatic quality switching
-  - **Advanced Upload Experience**: multipart uploads with pause/resume
+  - **Advanced Upload Experience**: multipart uploads with pause/resume/retry
   - **State Management**: Pinia for predictable state handling
 
 ## Quick Start
@@ -66,4 +66,19 @@ Also for local DNS, update `/etc/hosts` with hostnnames, match with minikube ing
 192.168.49.2 videos.simplevod.app
 192.168.49.2 console.minio.simplevod.app
 192.168.49.2 api.minio.simplevod.app
+```
+
+### TLS
+
+```bash
+# generate tls certs and ca
+./gen-certs.sh
+
+# trust the generated ca (archlinux)
+sudo cp ca.crt /etc/ca-certificates/trust-source/anchors/simplevod-ca.crt
+sudo update-ca-trust
+```
+
+```
+
 ```

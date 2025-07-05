@@ -79,6 +79,8 @@ OLD_SHIT/
 ERRORS/
 
 helm/app/values-override.yaml
+helm/app/tls/ca.*
+helm/app/tls/simplevod.*
 
 *.db
 *.sqlite
