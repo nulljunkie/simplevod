@@ -75,7 +75,7 @@ Also for local DNS, update `/etc/hosts` with hostnnames, match with minikube ing
 ./gen-certs.sh
 
 # trust the generated ca (archlinux)
-sudo cp ca.crt /etc/ca-certificates/trust-source/anchors/simplevod-ca.crt
+sudo cp helm/app/tls/ca.crt /etc/ca-certificates/trust-source/anchors/simplevod-ca.crt
 sudo update-ca-trust
 ```
 
