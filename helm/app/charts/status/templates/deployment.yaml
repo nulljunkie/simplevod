@@ -85,15 +85,12 @@ spec:
           {{- end }}
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
+          {{- if .Values.healthCheck.enabled }}
           ports:
-            - name: http
-              containerPort: {{ .Values.service.port }}
-              protocol: TCP
-            {{- if .Values.healthCheck.enabled }}
             - name: health
               containerPort: {{ .Values.healthCheck.port }}
               protocol: TCP
-            {{- end }}
+          {{- end }}
           env:
             - name: MONGO_URL
               valueFrom:

@@ -22,7 +22,7 @@
         :class="[
           'absolute z-40 mt-2 w-56 rounded-md shadow-lg focus:outline-none',
           props.variant === 'transparent' 
-            ? 'bg-primary-dark/30 backdrop-blur-sm border border-primary-gray/30' 
+            ? 'bg-primary-dark/60 backdrop-blur-sm border border-primary-gray/30' 
             : 'bg-primary-dark border border-primary-gray',
           originClass,
           alignmentClass
