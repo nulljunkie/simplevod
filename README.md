@@ -78,7 +78,3 @@ Also for local DNS, update `/etc/hosts` with hostnnames, match with minikube ing
 sudo cp helm/app/tls/ca.crt /etc/ca-certificates/trust-source/anchors/simplevod-ca.crt
 sudo update-ca-trust
 ```
-
-```
-
-```
