@@ -22,6 +22,7 @@ export function useHlsPlayer(videoElement: Ref<HTMLVideoElement | null>, videoDe
   let updateInterval: NodeJS.Timeout | null = null;
   const isMouseMoving = ref(false);
   let mouseMoveTimeout: NodeJS.Timeout | null = null;
+  let bufferingTimeout: NodeJS.Timeout | null = null;
 
   const _handleMouseMove = () => {
     isMouseMoving.value = true;
@@ -29,6 +30,24 @@ export function useHlsPlayer(videoElement: Ref<HTMLVideoElement | null>, videoDe
     mouseMoveTimeout = setTimeout(() => {
       isMouseMoving.value = false;
     }, 3000); // Hide controls after 3 seconds of inactivity
+  };
+
+  const setBufferingState = (isBuffering: boolean, immediate = false) => {
+    if (bufferingTimeout) {
+      clearTimeout(bufferingTimeout);
+      bufferingTimeout = null;
+    }
+    
+    if (immediate) {
+      playerState.isBuffering = isBuffering;
+      return;
+    }
+    
+    // Debounce buffering state changes to prevent flicker
+    bufferingTimeout = setTimeout(() => {
+      playerState.isBuffering = isBuffering;
+      bufferingTimeout = null;
+    }, 150); // 150ms debounce
   };
 
 
@@ -124,25 +143,21 @@ export function useHlsPlayer(videoElement: Ref<HTMLVideoElement | null>, videoDe
       });
 
        hls.on(Hls.Events.FRAG_BUFFERED, () => {
-            playerState.isBuffering = false;
+            setBufferingState(false, true); // Immediate hide when fragment is buffered
         });
         hls.on(Hls.Events.FRAG_LOAD_EMERGENCY_ABORTED, () => {
-            playerState.isBuffering = false;
+            setBufferingState(false, true); // Immediate hide on abort
         });
-        // The 'BUFFER_STALLED' event seems to cause a lint error in this environment,
-        // even though it appears to be a valid HLS.js event. Commenting out for now.
-        // The 'waiting' event on the video element and other buffer events should
-        // provide a reasonable buffering indication.
-        // hls.on(Hls.Events.BUFFER_STALLED, () => {
-        //     playerState.isBuffering = true;
-        // });
          hls.on(Hls.Events.BUFFER_APPENDING, () => {
-            playerState.isBuffering = true; // Show buffering when new data is being appended
+            // Only show buffering if video is actually waiting for data
+            if (video.readyState < video.HAVE_FUTURE_DATA) {
+              setBufferingState(true);
+            }
         });
         hls.on(Hls.Events.BUFFER_APPENDED, () => {
-            // Check if we still need to buffer or if playback can resume
-            if (video.paused && video.readyState >= video.HAVE_FUTURE_DATA) {
-                 playerState.isBuffering = false;
+            // More intelligent buffering logic - check if we have sufficient buffer
+            if (video.readyState >= video.HAVE_FUTURE_DATA) {
+                setBufferingState(false, true); // Immediate hide when buffer is ready
             }
         });
 
@@ -171,8 +186,10 @@ export function useHlsPlayer(videoElement: Ref<HTMLVideoElement | null>, videoDe
       playerState.volume = video.volume;
       playerState.isMuted = video.muted;
     });
-    video.addEventListener('waiting', () => playerState.isBuffering = true);
-    video.addEventListener('playing', () => playerState.isBuffering = false);
+    // Primary buffering control via video events (prioritized over HLS events)
+    video.addEventListener('waiting', () => setBufferingState(true, true));
+    video.addEventListener('playing', () => setBufferingState(false, true)); // Immediate hide
+    video.addEventListener('canplay', () => setBufferingState(false, true)); // Immediate hide
     video.addEventListener('ratechange', () => playerState.playbackRate = video.playbackRate);
     video.addEventListener('fullscreenchange', () => {
         playerState.isFullScreen = !!document.fullscreenElement;
@@ -212,6 +229,10 @@ export function useHlsPlayer(videoElement: Ref<HTMLVideoElement | null>, videoDe
 
   function cleanupPlayer() {
     if (updateInterval) clearInterval(updateInterval);
+    if (bufferingTimeout) {
+      clearTimeout(bufferingTimeout);
+      bufferingTimeout = null;
+    }
     if (hls) {
       hls.destroy();
       hls = null;
@@ -226,7 +247,10 @@ export function useHlsPlayer(videoElement: Ref<HTMLVideoElement | null>, videoDe
             playerContainer.removeEventListener('mousemove', _handleMouseMove);
             playerContainer.removeEventListener('mouseleave', () => isMouseMoving.value = false);
         }
-        if (mouseMoveTimeout) clearTimeout(mouseMoveTimeout);
+        if (mouseMoveTimeout) {
+          clearTimeout(mouseMoveTimeout);
+          mouseMoveTimeout = null;
+        }
     }
     // Reset state if needed
     Object.assign(playerState, {

@@ -19,6 +19,7 @@ export default {
           smoke: '#f2ede4',    // text
           silver: '#9ca3af',   // text
           gray: '#2a2e2f',     // borders
+          skeleton: '#1a1e1f', // skeleton
           success: '#10b981',  // successes
           error: '#ef4444',    // errors
         },
