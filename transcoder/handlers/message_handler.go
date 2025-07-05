@@ -11,6 +11,7 @@ import (
 	"transcoder/config"
 	"transcoder/kubernetes"
 	"transcoder/models"
+	"transcoder/rabbitmq"
 	"transcoder/redis"
 	"transcoder/validation"
 )
@@ -19,6 +20,7 @@ type MessageHandler struct {
 	configuration       *config.Config
 	jobSubmitter        kubernetes.JobSubmitter
 	redisClient         redis.RedisClient
+	statusPublisher     *rabbitmq.StatusPublisher
 	initializationMutex sync.Mutex
 	initializedVideos   map[string]bool
 	messageValidator    *validation.MessageValidator
@@ -26,10 +28,12 @@ type MessageHandler struct {
 }
 
 func NewMessageHandler(cfg *config.Config, jobSubmitter kubernetes.JobSubmitter, redisClient redis.RedisClient) *MessageHandler {
+	statusPublisher := rabbitmq.NewStatusPublisher(&cfg.RabbitMQ)
 	return &MessageHandler{
 		configuration:      cfg,
 		jobSubmitter:       jobSubmitter,
 		redisClient:        redisClient,
+		statusPublisher:    statusPublisher,
 		initializedVideos:  make(map[string]bool),
 		messageValidator:   validation.NewMessageValidator(),
 		jobConfigValidator: validation.NewJobConfigValidator(),
@@ -50,6 +54,18 @@ func (h *MessageHandler) Process(ctx context.Context, body []byte) error {
 
 	h.logProcessingStart(message)
 
+	// Publish "transcoding" status when we first start processing a video
+	if h.isFirstMessageForVideo(message) {
+		metadata := map[string]interface{}{
+			"video_url": message.VideoURL,
+			"total_messages": message.TotalMessages,
+		}
+		if err := h.statusPublisher.PublishStatus(message.VideoID, "transcoding", metadata, nil); err != nil {
+			log.Printf("Failed to publish transcoding status for video %s: %v", message.VideoID, err)
+			// Continue processing even if status publishing fails
+		}
+	}
+
 	timestampData := h.formatTimestamps(message.Timestamps)
 	if h.hasNoTimestamps(timestampData) {
 		h.logNoTimestampsWarning(message)
@@ -57,6 +73,15 @@ func (h *MessageHandler) Process(ctx context.Context, body []byte) error {
 	}
 
 	if err := h.processTranscodeJobs(ctx, message, timestampData); err != nil {
+		// Publish "failed" status if job processing fails
+		errorMsg := err.Error()
+		metadata := map[string]interface{}{
+			"video_url": message.VideoURL,
+			"message_id": message.MessageID,
+		}
+		if statusErr := h.statusPublisher.PublishStatus(message.VideoID, "failed", metadata, &errorMsg); statusErr != nil {
+			log.Printf("Failed to publish failed status for video %s: %v", message.VideoID, statusErr)
+		}
 		return err
 	}
 
@@ -289,6 +314,10 @@ func (h *MessageHandler) logJobCreationSuccess(message *models.Message, resoluti
 
 func (h *MessageHandler) isValidMessage(message *models.Message) bool {
 	return h.messageValidator.IsValidMessage(message)
+}
+
+func (h *MessageHandler) isFirstMessageForVideo(message *models.Message) bool {
+	return message.MessageID == 1
 }
 
 func (h *MessageHandler) logInvalidMessage(message *models.Message) {

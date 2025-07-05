@@ -72,7 +72,7 @@ exports.getVideoDetails = async (req, res) => {
 
     if (
       video.status !== VIDEO_STATUS.PUBLISHED &&
-      (!req.user || req.user.id !== video.user_id)
+      (!req.user || req.user.user_id !== video.user_id)
     ) {
       return errorResponse(res, 'Video not available', 403);
     }
@@ -129,7 +129,7 @@ exports.incrementViewCount = async (req, res) => {
 exports.likeVideo = async (req, res) => {
   try {
     const { videoId } = req.params;
-    const userId = req.user.id;
+    const userId = req.user.user_id;
 
     // In a real implementation, you'd have a likes collection
     // For simplicity, we're just incrementing the likes count
@@ -157,7 +157,7 @@ exports.likeVideo = async (req, res) => {
 exports.updateVideo = async (req, res) => {
   try {
     const { videoId } = req.params;
-    const userId = req.user.id;
+    const userId = req.user.user_id;
     const { title, description, tags, visibility } = req.body;
 
     const video = await Video.findOne({ unique_key: videoId });
@@ -192,7 +192,7 @@ exports.updateVideo = async (req, res) => {
 exports.deleteVideo = async (req, res) => {
   try {
     const { videoId } = req.params;
-    const userId = req.user.id;
+    const userId = req.user.user_id;
 
     const video = await Video.findOne({ unique_key: videoId });
     if (!video) {
@@ -214,5 +214,129 @@ exports.deleteVideo = async (req, res) => {
   } catch (error) {
     logger.error('Error deleting video:', error);
     return errorResponse(res, 'Failed to delete video', 500);
+  }
+};
+
+exports.getMyVideos = async (req, res) => {
+  try {
+    const userId = req.user.user_id;
+    const {
+      page = 1,
+      limit = DEFAULT_PAGE_SIZE,
+      sort = 'uploaded_at',
+      order = 'desc',
+      status,
+    } = req.query;
+
+    logger.info(`Fetching videos for user: ${userId}, query: ${JSON.stringify(req.query)}`);
+
+    const query = { user_id: userId };
+    
+    if (status) {
+      query.status = status;
+    }
+
+    logger.info(`Database query: ${JSON.stringify(query)}`);
+
+    const totalCount = await Video.countDocuments(query);
+    logger.info(`Total videos found: ${totalCount}`);
+
+    const sortObj = { [sort]: order === 'asc' ? 1 : -1 };
+
+    const videos = await Video.find(query)
+      .sort(sortObj)
+      .skip((page - 1) * limit)
+      .limit(Number(limit))
+      .select('unique_key title description thumbnail_urls duration_seconds status visibility views_count likes_count uploaded_at published_at');
+
+    logger.info(`Videos returned: ${videos.length}`);
+
+    return successResponse(res, {
+      videos: videos.map(video => ({
+        id: video.unique_key,
+        title: video.title,
+        description: video.description,
+        thumbnail_url: video.thumbnail_urls?.small,
+        duration_seconds: video.duration_seconds,
+        status: video.status,
+        visibility: video.visibility,
+        views_count: video.views_count,
+        likes_count: video.likes_count,
+        uploaded_at: video.uploaded_at,
+        published_at: video.published_at,
+      })),
+      total_count: totalCount,
+      page: Number(page),
+      total_pages: Math.ceil(totalCount / limit),
+    });
+  } catch (error) {
+    logger.error('Error fetching user videos:', error);
+    return errorResponse(res, 'Failed to fetch user videos', 500);
+  }
+};
+
+exports.pollVideoStatuses = async (req, res) => {
+  try {
+    const userId = req.user.user_id;
+    const { video_ids } = req.query;
+
+    if (!video_ids) {
+      return errorResponse(res, 'video_ids parameter is required', 400);
+    }
+
+    const videoIds = video_ids.split(',').map(id => id.trim());
+    
+    if (videoIds.length === 0) {
+      return errorResponse(res, 'At least one video ID is required', 400);
+    }
+
+    const videos = await Video.find({ 
+      unique_key: { $in: videoIds }, 
+      user_id: userId 
+    }).select('unique_key status published_at');
+
+    const statuses = {};
+    videos.forEach(video => {
+      statuses[video.unique_key] = {
+        status: video.status,
+        published_at: video.published_at
+      };
+    });
+
+    return successResponse(res, {
+      statuses,
+      timestamp: new Date().toISOString(),
+    });
+  } catch (error) {
+    logger.error('Error polling video statuses:', error);
+    return errorResponse(res, 'Failed to poll video statuses', 500);
+  }
+};
+
+exports.getVideoStatus = async (req, res) => {
+  try {
+    const { videoId } = req.params;
+    const userId = req.user.user_id;
+
+    const video = await Video.findOne({ unique_key: videoId })
+      .select('user_id status published_at uploaded_at');
+
+    if (!video) {
+      return errorResponse(res, 'Video not found', 404);
+    }
+
+    if (video.user_id !== userId) {
+      return errorResponse(res, 'Not authorized to view this video status', 403);
+    }
+
+    return successResponse(res, {
+      id: videoId,
+      status: video.status,
+      published_at: video.published_at,
+      uploaded_at: video.uploaded_at,
+    });
+  } catch (error) {
+    logger.error('Error getting video status:', error);
+    return errorResponse(res, 'Failed to get video status', 500);
   }
 };

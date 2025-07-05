@@ -45,6 +45,11 @@ services:
       context: ./videos/
     image: simplevod/videos:latest
 
+  status:
+    build:
+      context: ./status/
+    image: simplevod/status:latest
+
   finalizer:
     build:
       context: ./finalizer/

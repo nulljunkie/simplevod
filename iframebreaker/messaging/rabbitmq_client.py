@@ -144,6 +144,45 @@ class RabbitMQClient:
                     
         return False
 
+    def publish_status(self, video_id: str, status: str, service: str = "iframebreaker", metadata: dict = None, error: str = None) -> bool:
+        """Publish a status update message to RabbitMQ with retry logic."""
+        from datetime import datetime
+        
+        status_payload = {
+            "video_id": video_id,
+            "status": status,
+            "service": service,
+            "timestamp": datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%SZ'),
+            "metadata": metadata or {},
+            "error": error
+        }
+        
+        for attempt in range(self.max_retries):
+            if not self._ensure_connection():
+                return False
+                
+            try:
+                self.channel.basic_publish(
+                    exchange="video",
+                    routing_key="video.status",
+                    body=json.dumps(status_payload),
+                    properties=pika.BasicProperties(delivery_mode=2)
+                )
+                self._record_success()
+                logging.info(f"Published status update: video_id={video_id}, status={status}")
+                return True
+                
+            except Exception as err:
+                logging.error(f"Failed to publish status (attempt {attempt + 1}): {err}")
+                self._record_failure()
+                self.connection = None
+                self.channel = None
+                
+                if attempt < self.max_retries - 1:
+                    time.sleep(min(2 ** attempt, 10))
+                    
+        return False
+
     def consume(self, callback):
         """Start consuming messages from the queue with automatic reconnection."""
         while True:

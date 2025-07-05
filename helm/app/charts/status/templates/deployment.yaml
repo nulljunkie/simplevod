@@ -1,0 +1,178 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "status.fullname" . }}
+  labels:
+    {{- include "status.labels" . | nindent 4 }}
+spec:
+  {{- if not .Values.autoscaling.enabled }}
+  replicas: {{ .Values.replicaCount }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "status.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        {{- include "status.labels" . | nindent 8 }}
+        {{- with .Values.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "status.serviceAccountName" . }}
+      {{- with .Values.podSecurityContext }}
+      securityContext:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      initContainers:
+        - name: wait-for-mongodb
+          image: busybox:latest
+          command: ['sh', '-c']
+          args:
+            - |
+              echo "Waiting for MongoDB to be ready..."
+              until nc -z $MONGO_HOST $MONGO_PORT; do
+                echo "MongoDB not ready, waiting 5 seconds..."
+                sleep 5
+              done
+              echo "MongoDB is ready!"
+          env:
+            - name: MONGO_HOST
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ include "status.fullname" . }}
+                  key: mongo_host
+            - name: MONGO_PORT
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ include "status.fullname" . }}
+                  key: mongo_port
+        - name: wait-for-rabbitmq
+          image: busybox:latest
+          command: ['sh', '-c']
+          args:
+            - |
+              echo "Waiting for RabbitMQ to be ready..."
+              until nc -z $RABBITMQ_HOST $RABBITMQ_PORT; do
+                echo "RabbitMQ not ready, waiting 5 seconds..."
+                sleep 5
+              done
+              echo "RabbitMQ is ready!"
+          env:
+            - name: RABBITMQ_HOST
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ include "status.fullname" . }}
+                  key: rabbitmq_host
+            - name: RABBITMQ_PORT
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ include "status.fullname" . }}
+                  key: rabbitmq_port
+      containers:
+        - name: {{ .Chart.Name }}
+          {{- with .Values.securityContext }}
+          securityContext:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.service.port }}
+              protocol: TCP
+            {{- if .Values.healthCheck.enabled }}
+            - name: health
+              containerPort: {{ .Values.healthCheck.port }}
+              protocol: TCP
+            {{- end }}
+          env:
+            - name: MONGO_URL
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "status.fullname" . }}
+                  key: mongo_url
+            - name: MONGO_DB_NAME
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ include "status.fullname" . }}
+                  key: mongo_db_name
+            - name: RABBITMQ_HOST
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ include "status.fullname" . }}
+                  key: rabbitmq_host
+            - name: RABBITMQ_PORT
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ include "status.fullname" . }}
+                  key: rabbitmq_port
+            - name: RABBITMQ_VHOST
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ include "status.fullname" . }}
+                  key: rabbitmq_vhost
+            - name: RABBITMQ_USER
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "status.fullname" . }}
+                  key: rabbitmq_user
+            - name: RABBITMQ_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "status.fullname" . }}
+                  key: rabbitmq_password
+            - name: RABBITMQ_CONSUME_QUEUE
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ include "status.fullname" . }}
+                  key: rabbitmq_consume_queue
+            {{- if .Values.healthCheck.enabled }}
+            - name: HEALTH_PORT
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ include "status.fullname" . }}
+                  key: health_port
+            {{- end }}
+            - name: LOG_DEBUG
+              value: {{ .Values.debug | default .Values.global.debug | quote }}
+          {{- with .Values.livenessProbe }}
+          livenessProbe:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.readinessProbe }}
+          readinessProbe:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.volumeMounts }}
+          volumeMounts:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+      {{- with .Values.volumes }}
+      volumes:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

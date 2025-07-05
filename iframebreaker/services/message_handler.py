@@ -16,6 +16,7 @@ class MessageHandler:
 
     def process_video_message(self, ch, method, properties, body):
         """Process incoming RabbitMQ message."""
+        video_id = None
         try:
             message_data = json.loads(body.decode('utf-8'))
 
@@ -31,6 +32,12 @@ class MessageHandler:
 
             # URL decode the key since MinIO sends it encoded but the client will encode it again
             key = unquote(encoded_key)
+            video_id = self.video_service.extract_video_id(key)
+            
+            # Publish 'processing' status when we start processing
+            if not self.rabbitmq_client.publish_status(video_id, "processing", metadata={"bucket": bucket, "key": key}):
+                logging.warning(f"Failed to publish processing status for {video_id}")
+                # Continue processing even if status publishing fails
 
             presigned_url = self.minio_client.get_presigned_url(bucket, key)
             
@@ -60,16 +67,19 @@ class MessageHandler:
                                 break
                 
             if not presigned_url:
-                logging.error(f"Failed to generate presigned URL for {bucket}/{key} (tried both original and sanitized)")
+                error_msg = f"Failed to generate presigned URL for {bucket}/{key} (tried both original and sanitized)"
+                logging.error(error_msg)
+                self.rabbitmq_client.publish_status(video_id, "failed", error=error_msg)
                 ch.basic_nack(delivery_tag=method.delivery_tag, requeue=False)
                 return
 
-            video_id = self.video_service.extract_video_id(key)
             logging.info(f"Processing New Upload: {key}")
 
             keyframes, total_duration = self.video_service.get_video_info(presigned_url)
             if keyframes is None or total_duration is None:
-                logging.error(f"Failed to get video info for {key}")
+                error_msg = f"Failed to get video info for {key}"
+                logging.error(error_msg)
+                self.rabbitmq_client.publish_status(video_id, "failed", error=error_msg)
                 ch.basic_nack(delivery_tag=method.delivery_tag, requeue=False)
                 return
 
@@ -94,16 +104,24 @@ class MessageHandler:
                     "total_messages": total_messages
                 }
                 if not self.rabbitmq_client.publish_segment(segment_payload):
-                    logging.error(f"Failed to publish segment {message_id} for {video_id}")
+                    error_msg = f"Failed to publish segment {message_id} for {video_id}"
+                    logging.error(error_msg)
+                    self.rabbitmq_client.publish_status(video_id, "failed", error=error_msg)
                     ch.basic_nack(delivery_tag=method.delivery_tag, requeue=True)
                     return
 
             logging.info(f"Processed: {key}, {total_messages} messages published to \"{self.config.RABBITMQ_PUBLISH_EXCHANGE}\" exchange")
             ch.basic_ack(delivery_tag=method.delivery_tag)
 
-        except json.JSONDecodeError:
-            logging.error(f"Failed to decode message: {body}")
+        except json.JSONDecodeError as e:
+            error_msg = f"Failed to decode message: {body}"
+            logging.error(error_msg)
+            if video_id:
+                self.rabbitmq_client.publish_status(video_id, "failed", error=error_msg)
             ch.basic_nack(delivery_tag=method.delivery_tag, requeue=False)
         except Exception as e:
-            logging.error(f"Unexpected error: {e}")
+            error_msg = f"Unexpected error: {e}"
+            logging.error(error_msg)
+            if video_id:
+                self.rabbitmq_client.publish_status(video_id, "failed", error=error_msg)
             ch.basic_nack(delivery_tag=method.delivery_tag, requeue=True)

@@ -33,11 +33,11 @@ class VideoService:
             description=session_data.description,
             original_filename=session_data.filename,
             original_content_type=session_data.content_type,
-            size_bytes=0,  # Placeholder, to be updated by processing
+            size_bytes=0, # TODO: to be implemented
             duration_seconds=int(session_data.duration) if session_data.duration else None,
             user_id=user_id,
             uploader_username=username,
-            status="published",
+            status="uploaded",
             visibility=session_data.visibility,
             raw_file_info=RawFileInfo(
                 bucket=minio_config.bucket,

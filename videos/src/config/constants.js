@@ -1,15 +1,15 @@
 module.exports = {
   JWT_SECRET: process.env.JWT_SECRET || 'your_jwt_secret',
-  JWT_EXPIRE: process.env.JWT_EXPIRE || '30d',
   VIDEO_STATUS: {
+    UPLOADED: 'uploaded',
     PENDING_METADATA: 'pending_metadata',
+    PROCESSING: 'processing',
     TRANSCODING: 'transcoding',
     PUBLISHED: 'published',
     FAILED: 'failed',
   },
   VIDEO_VISIBILITY: {
     PUBLIC: 'public',
-    UNLISTED: 'unlisted',
     PRIVATE: 'private',
   },
   DEFAULT_PAGE_SIZE: 20,

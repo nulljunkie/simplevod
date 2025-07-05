@@ -530,7 +530,7 @@ rabbitmq:
             {
               "user": "transcode",
               "vhost": "transcode",
-              "configure": "^video$|^upload$|^transcode$|^playlist$|^finish$",  
+              "configure": "^video$|^upload$|^transcode$|^playlist$|^finish$|^status$",  
               "write": ".*",
               "read": ".*"
             }
@@ -581,6 +581,15 @@ rabbitmq:
               "arguments": {
                 "x-queue-type": "classic"
               }
+            },
+            {
+              "name": "status",
+              "vhost": "transcode",
+              "durable": true,
+              "auto_delete": false,
+              "arguments": {
+                "x-queue-type": "classic"
+              }
             }
           ],
           "bindings": [
@@ -614,6 +623,14 @@ rabbitmq:
               "destination": "finish",
               "destination_type": "queue",
               "routing_key": "video.finish",
+              "arguments": {}
+            },
+            {
+              "source": "video",
+              "vhost": "transcode",
+              "destination": "status",
+              "destination_type": "queue",
+              "routing_key": "video.status",
               "arguments": {}
             }
           ],
@@ -698,9 +715,9 @@ transcoder:
     # resolutions: 240,360,480,720,1080
     # crfMap: 240:36,360:34,480:32,720:30,1080:28
     # masterPlaylist: 240:500000,360:800000,480:1200000,720:2000000,1080:5000000
-    resolutions: 240,720
-    crfMap: 240:36,720:30
-    masterPlaylist: 240:500000,720:2000000
+    resolutions: 240
+    crfMap: 240:36
+    masterPlaylist: 240:500000
 
 
 playlist:
@@ -768,3 +785,21 @@ videos:
      - secretName: ingress-tls
        hosts:
          - videos.simplevod.app
+
+status:
+  nameOverride: status
+  image:
+    repository: simplevod/status
+    pullPolicy: IfNotPresent
+    tag: latest
+  rabbitmq:
+    user: "transcode"
+    password: "password"
+    vhost: "transcode"
+    queue: "status"
+    exchange: "video"
+    routingKey: "video.status"
+  mongodb:
+    username: root
+    password: rootpassword
+    database: upload

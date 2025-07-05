@@ -26,6 +26,14 @@
         Your Profile
       </NuxtLink>
       <NuxtLink
+        to="/uploads"
+        @click="close"
+        class="block px-4 py-2 text-sm text-primary-smoke hover:font-bold"
+        role="menuitem"
+      >
+        My Uploads
+      </NuxtLink>
+      <NuxtLink
         to="/settings"
         @click="close"
         class="block px-4 py-2 text-sm text-primary-smoke hover:font-bold"
