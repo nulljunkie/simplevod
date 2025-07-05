@@ -5,7 +5,7 @@ import type { VideoListItem, VideoDetail, VideoListResponseData, ApiResponse } f
 export const useVideosStore = defineStore('videos', () => {
   const videos = ref<VideoListItem[]>([]);
   const currentVideo = ref<VideoDetail | null>(null);
-  const isLoadingList = ref<boolean>(false);
+  const isLoadingList = ref<boolean>(true);
   const isLoadingDetail = ref<boolean>(false);
   const error = ref<string | null>(null);
   const pagination = ref({

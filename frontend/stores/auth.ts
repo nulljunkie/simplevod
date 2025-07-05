@@ -13,8 +13,14 @@ import {
 } from '~/types/api';
 
 export const useAuthStore = defineStore('auth', () => {
-  const user = ref<User | null>(null);
-  const token = ref<string | null>(null);
+  const user = useCookie<User | null>('auth-user', { 
+    default: () => null,
+    maxAge: 60 * 60 * 24 * 7 // 7 days
+  });
+  const token = useCookie<string | null>('auth-token', { 
+    default: () => null,
+    maxAge: 60 * 60 * 24 * 7 // 7 days
+  });
   const isLoading = ref(false);
   const error = ref<string | null>(null);
   const activationMessage = ref<string | null>(null);
@@ -26,8 +32,10 @@ export const useAuthStore = defineStore('auth', () => {
 
   function setToken(newToken: string | null) {
     token.value = newToken;
-    const tokenCookie = useCookie('auth-token', { maxAge: 60 * 60 * 24 * 7 }); // 7 days
-    tokenCookie.value = newToken;
+  }
+
+  function setUser(newUser: User | null) {
+    user.value = newUser;
   }
 
   function clearError() {
@@ -39,16 +47,8 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   async function initializeAuth() {
-    const tokenCookie = useCookie<string | null>('auth-token');
-    const storedUser = localStorage.getItem('auth-user');
-
-    if (tokenCookie.value) {
-      setToken(tokenCookie.value);
-      if (storedUser) {
-        user.value = JSON.parse(storedUser);
-      }
-      // TODO: Fetch user profile when implemented
-    }
+    // With useCookie, the auth state is automatically hydrated
+    // No additional initialization needed
   }
 
   async function login(credentials: LoginRequest): Promise<boolean> {
@@ -61,15 +61,15 @@ export const useAuthStore = defineStore('auth', () => {
       if (!response.success) {
         error.value = response.message || 'Login failed.';
         setToken(null);
-        localStorage.removeItem('auth-user');
+        user.value = null;
         return false;
       }
       const accessToken = response.data?.access;
       if (accessToken) {
         setToken(accessToken);
       }
-      user.value = { id: 'temp-user-id', email: credentials.email, isActive: true };
-      localStorage.setItem('auth-user', JSON.stringify(user.value));
+      const userData = { id: 'temp-user-id', email: credentials.email, isActive: true };
+      user.value = userData;
       return true;
     } catch (err: any) {
       if (err instanceof ApiError) {
@@ -78,7 +78,7 @@ export const useAuthStore = defineStore('auth', () => {
       }
       error.value = 'An unexpected error occurred during login.';
       setToken(null);
-      localStorage.removeItem('auth-user');
+      setUser(null);
       return false;
     } finally {
       setLoading(false);
@@ -148,8 +148,8 @@ export const useAuthStore = defineStore('auth', () => {
       if (accessToken) {
         setToken(accessToken);
       }
-      user.value = { id: 'activated-user-id', email: 'unknown', isActive: true };
-      localStorage.setItem('auth-user', JSON.stringify(user.value));
+      const userData = { id: 'activated-user-id', email: 'unknown', isActive: true };
+      user.value = userData;
       activationMessage.value = 'Account activated successfully!';
       return true;
     } catch (err: unknown) {
@@ -162,8 +162,7 @@ export const useAuthStore = defineStore('auth', () => {
 
   function logout() {
     user.value = null;
-    setToken(null);
-    localStorage.removeItem('auth-user');
+    token.value = null;
   }
 
   return {

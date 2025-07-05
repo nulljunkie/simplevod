@@ -57,7 +57,9 @@ const emit = defineEmits<{
   (e: 'logout'): void
 }>()
 
-const avatar = computed(() =>
-  `https://ui-avatars.com/api/?name=${encodeURIComponent(props.email || 'User')}&background=150050&color=FB2576&size=32`
-)
+const avatar = computed(() => {
+  // Extract name from email or use a better fallback
+  const emailUsername = props.email ? props.email.split('@')[0] : 'Anonymous User';
+  return `https://ui-avatars.com/api/?name=${encodeURIComponent(emailUsername)}&background=150050&color=FB2576&size=32`;
+})
 </script>
