@@ -1,9 +1,9 @@
 <template>
-  <div class="bg-primary-dark border border-primary-gray rounded-lg p-6 animate-pulse">
-    <div class="flex items-start space-x-6">
+  <div class="relative bg-primary-dark border border-primary-gray rounded-lg p-3 sm:p-6 animate-pulse">
+    <div class="flex flex-col sm:flex-row items-start space-y-4 sm:space-y-0 sm:space-x-6">
       <!-- Thumbnail Skeleton -->
-      <div class="flex-shrink-0">
-        <div class="w-48 h-32 bg-primary-skeleton rounded-lg"></div>
+      <div class="flex-shrink-0 w-full sm:w-auto">
+        <div class="w-full h-32 sm:w-48 sm:h-32 bg-primary-skeleton rounded-lg"></div>
       </div>
 
       <!-- Video Details Skeleton -->
@@ -15,7 +15,7 @@
         </div>
 
         <!-- File Info Row -->
-        <div class="grid grid-cols-2 gap-8">
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-8">
           <div class="flex items-center space-x-2">
             <div class="h-4 bg-primary-skeleton rounded w-16"></div>
             <div class="h-4 bg-primary-skeleton rounded w-24"></div>
@@ -27,7 +27,7 @@
         </div>
 
         <!-- Duration and Upload Time Row -->
-        <div class="grid grid-cols-2 gap-8">
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-8">
           <div class="flex items-center space-x-2">
             <div class="h-4 bg-primary-skeleton rounded w-16"></div>
             <div class="h-4 bg-primary-skeleton rounded w-16"></div>
@@ -39,7 +39,7 @@
         </div>
 
         <!-- Visibility Row -->
-        <div class="flex items-center space-x-4">
+        <div class="flex flex-col sm:flex-row items-start sm:items-center space-y-2 sm:space-y-0 sm:space-x-4">
           <div class="h-4 bg-primary-skeleton rounded w-16"></div>
           <div class="flex items-center space-x-4">
             <div class="flex items-center space-x-2">
@@ -68,7 +68,7 @@
       </div>
 
       <!-- Delete Button Skeleton -->
-      <div class="flex-shrink-0">
+      <div class="flex-shrink-0 absolute top-3 right-3 sm:static">
         <div class="w-9 h-9 bg-primary-skeleton rounded"></div>
       </div>
     </div>

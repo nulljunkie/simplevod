@@ -1,13 +1,13 @@
 <template>
-  <div class="bg-primary-dark border border-primary-gray rounded-lg p-6">
-    <div class="flex items-start space-x-6">
+  <div class="relative bg-primary-dark border border-primary-gray rounded-lg p-3 sm:p-6">
+    <div class="flex flex-col sm:flex-row items-start space-y-4 sm:space-y-0 sm:space-x-6">
       <!-- Thumbnail -->
-      <div class="flex-shrink-0">
+      <div class="flex-shrink-0 w-full sm:w-auto">
         <UiVideoThumbnail
           :thumbnail-url="video.thumbnail_url"
           :title="video.title"
           :duration="video.duration_seconds"
-          class="w-48 h-32"
+          class="w-full h-32 sm:w-48 sm:h-32"
         />
       </div>
 
@@ -29,7 +29,7 @@
         </div>
 
         <!-- File Info Row -->
-        <div class="grid grid-cols-2 gap-8 text-sm">
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-8 text-sm">
           <div>
             <span class="text-primary-silver">filename: </span>
             <span class="text-primary-smoke">{{ video.original_filename || 'video.mp4' }}</span>
@@ -41,7 +41,7 @@
         </div>
 
         <!-- Duration and Upload Time Row -->
-        <div class="grid grid-cols-2 gap-8 text-sm">
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-8 text-sm">
           <div>
             <span class="text-primary-silver">duration: </span>
             <span class="text-primary-smoke">{{ formatDuration(video.duration_seconds) }}</span>
@@ -53,7 +53,7 @@
         </div>
 
         <!-- Visibility -->
-        <div class="flex items-center space-x-4">
+        <div class="flex flex-col sm:flex-row items-start sm:items-center space-y-2 sm:space-y-0 sm:space-x-4">
           <span class="text-primary-silver text-sm">visibility:</span>
           <div class="flex items-center space-x-4">
             <label class="flex items-center space-x-2 cursor-pointer">
@@ -100,7 +100,7 @@
       </div>
 
       <!-- Delete Button -->
-      <div class="flex-shrink-0">
+      <div class="flex-shrink-0 absolute top-3 right-3 sm:static">
         <button
           v-if="canDelete"
           @click="$emit('delete', video)"
