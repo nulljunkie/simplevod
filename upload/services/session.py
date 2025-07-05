@@ -1,7 +1,7 @@
 import json
 from typing import Dict, List
 from fastapi import HTTPException, status
-from core.redis import RedisClient
+from core.client_wrappers import ManagedRedisClient
 from models.models import SessionData
 from utils.keys import get_session_meta_key, get_session_parts_key
 from core.config import logger, redis_config
@@ -9,7 +9,7 @@ from core.config import logger, redis_config
 class SessionService:
     """Service for managing upload sessions in Redis with Pydantic validation."""
 
-    def __init__(self, redis: RedisClient):
+    def __init__(self, redis: ManagedRedisClient):
         self.redis = redis
 
     async def store_session(self, unique_key: str, session_data: SessionData) -> None:

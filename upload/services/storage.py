@@ -1,6 +1,6 @@
 from typing import Dict, List
 from datetime import timedelta
-from core.minio import MinioClient
+from core.client_wrappers import ManagedMinioClient
 from models.models import InitiateUploadRequest, SessionData, Parts
 from utils.keys import generate_unique_key
 from utils.filename import get_safe_filename
@@ -9,7 +9,7 @@ from core.config import minio_config, logger
 class StorageService:
     """Service for managing storage operations with MinIO."""
 
-    def __init__(self, minio: MinioClient):
+    def __init__(self, minio: ManagedMinioClient):
         self.minio = minio
 
     async def initiate_upload(self, request: InitiateUploadRequest, user_id: str) -> Dict:

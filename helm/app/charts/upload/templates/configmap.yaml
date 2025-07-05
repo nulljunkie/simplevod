@@ -10,9 +10,21 @@ data:
   minio_endpoint: {{ printf "%s-%s.%s" .Release.Name .Values.global.minio.nameOverride .Release.Namespace | quote }}
   minio_bucket: {{ .Values.minio.bucket | quote }}
   minio_use_ssl: {{ .Values.minio.use_ssl | quote }}
+  minio_external_endpoint: {{ .Values.minio.externalEndpoint | quote }}
   redis_host: {{ printf "%s-%s-master.%s" .Release.Name .Values.global.redis_upload.nameOverride .Release.Namespace | quote }}
   redis_port: {{ .Values.redis.port | quote }}
   redis_db: {{ .Values.redis.db | quote }}
+  redis_max_connections: {{ .Values.redis.maxConnections | quote }}
+  redis_health_check_interval: {{ .Values.redis.healthCheckInterval | quote }}
   mongo_host: {{ printf "%s-%s.%s" .Release.Name .Values.global.mongodb.nameOverride .Release.Namespace | quote }}
-  minio_external_endpoint: {{ .Values.minio.externalEndpoint | quote }}
+  mongo_max_pool_size: {{ .Values.mongodb.maxPoolSize | quote }}
+  mongo_min_pool_size: {{ .Values.mongodb.minPoolSize | quote }}
+  mongo_max_idle_time_ms: {{ .Values.mongodb.maxIdleTimeMs | quote }}
+  mongo_server_selection_timeout_ms: {{ .Values.mongodb.serverSelectionTimeoutMs | quote }}
+  retry_max_attempts: {{ .Values.retry.maxAttempts | quote }}
+  retry_min_wait_seconds: {{ .Values.retry.minWaitSeconds | quote }}
+  retry_max_wait_seconds: {{ .Values.retry.maxWaitSeconds | quote }}
+  retry_exponential_multiplier: {{ .Values.retry.exponentialMultiplier | quote }}
+  health_check_cache_duration: {{ .Values.healthCheck.cacheDurationSeconds | quote }}
+  health_check_timeout_seconds: {{ .Values.healthCheck.timeoutSeconds | quote }}
 {{- end }}

@@ -1,5 +1,5 @@
 global: 
-  debug: false # Set to true for verbose logging including health checks
+  debug: false
   
   jwtAuth:
     secret: supersecurejwtsecretkey
@@ -75,14 +75,12 @@ global:
       password: password
      
 postgresql_users:
-  # -----------
   nameOverride: postgresql-users
   auth:
     postgresPassword: postgres
     username: user
     password: password
     database: users
-  # -----------
   primary:
     persistence:
       enabled: false
@@ -448,14 +446,26 @@ upload:
     secret_key: uploaderpassword
     use_ssl: false
   mongodb:
-    # username: user
-    # password: password
     username: root
     password: rootpassword
     # database: upload
     database: ""
+    maxPoolSize: 20
+    minPoolSize: 5
+    maxIdleTimeMs: 30000
+    serverSelectionTimeoutMs: 5000
   redis:
     password: "redisuploadpassword"
+    maxConnections: 20
+    healthCheckInterval: 30
+  retry:
+    maxAttempts: 3
+    minWaitSeconds: 4
+    maxWaitSeconds: 10
+    exponentialMultiplier: 1
+  healthCheck:
+    cacheDurationSeconds: 30
+    timeoutSeconds: 5
   service:
     port: 8200
   ingress:

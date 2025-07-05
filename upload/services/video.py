@@ -1,6 +1,5 @@
 from datetime import datetime, timezone, timedelta
-from core.database import MongoDBClient
-from core.minio import MinioClient
+from core.client_wrappers import ManagedMongoDBClient
 from models.models import StoredVideo, RawFileInfo, ThumbnailUrls, SessionData, Parts
 from services.storage import StorageService
 from core.config import logger, minio_config
@@ -8,7 +7,7 @@ from core.config import logger, minio_config
 class VideoService:
     """Service for managing video metadata and processing."""
 
-    def __init__(self, mongo: MongoDBClient):
+    def __init__(self, mongo: ManagedMongoDBClient):
         self.mongo = mongo
 
     async def save_video(

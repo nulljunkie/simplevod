@@ -245,6 +245,118 @@ spec:
               value: "false"
             - name: LOG_DEBUG
               value: {{ .Values.debug | default .Values.global.debug | quote }}
+            
+            - name: REDIS_MAX_CONNECTIONS
+              valueFrom:
+                configMapKeyRef:
+                  {{- if .Values.existingConfigmap }}
+                  name: {{ .Values.existingConfigmap }}
+                  {{- else }}
+                  name: {{ include "upload.fullname" . }}
+                  {{- end }}
+                  key: redis_max_connections
+            - name: REDIS_HEALTH_CHECK_INTERVAL
+              valueFrom:
+                configMapKeyRef:
+                  {{- if .Values.existingConfigmap }}
+                  name: {{ .Values.existingConfigmap }}
+                  {{- else }}
+                  name: {{ include "upload.fullname" . }}
+                  {{- end }}
+                  key: redis_health_check_interval
+            
+            - name: MONGO_MAX_POOL_SIZE
+              valueFrom:
+                configMapKeyRef:
+                  {{- if .Values.existingConfigmap }}
+                  name: {{ .Values.existingConfigmap }}
+                  {{- else }}
+                  name: {{ include "upload.fullname" . }}
+                  {{- end }}
+                  key: mongo_max_pool_size
+            - name: MONGO_MIN_POOL_SIZE
+              valueFrom:
+                configMapKeyRef:
+                  {{- if .Values.existingConfigmap }}
+                  name: {{ .Values.existingConfigmap }}
+                  {{- else }}
+                  name: {{ include "upload.fullname" . }}
+                  {{- end }}
+                  key: mongo_min_pool_size
+            - name: MONGO_MAX_IDLE_TIME_MS
+              valueFrom:
+                configMapKeyRef:
+                  {{- if .Values.existingConfigmap }}
+                  name: {{ .Values.existingConfigmap }}
+                  {{- else }}
+                  name: {{ include "upload.fullname" . }}
+                  {{- end }}
+                  key: mongo_max_idle_time_ms
+            - name: MONGO_SERVER_SELECTION_TIMEOUT_MS
+              valueFrom:
+                configMapKeyRef:
+                  {{- if .Values.existingConfigmap }}
+                  name: {{ .Values.existingConfigmap }}
+                  {{- else }}
+                  name: {{ include "upload.fullname" . }}
+                  {{- end }}
+                  key: mongo_server_selection_timeout_ms
+            
+            - name: RETRY_MAX_ATTEMPTS
+              valueFrom:
+                configMapKeyRef:
+                  {{- if .Values.existingConfigmap }}
+                  name: {{ .Values.existingConfigmap }}
+                  {{- else }}
+                  name: {{ include "upload.fullname" . }}
+                  {{- end }}
+                  key: retry_max_attempts
+            - name: RETRY_MIN_WAIT_SECONDS
+              valueFrom:
+                configMapKeyRef:
+                  {{- if .Values.existingConfigmap }}
+                  name: {{ .Values.existingConfigmap }}
+                  {{- else }}
+                  name: {{ include "upload.fullname" . }}
+                  {{- end }}
+                  key: retry_min_wait_seconds
+            - name: RETRY_MAX_WAIT_SECONDS
+              valueFrom:
+                configMapKeyRef:
+                  {{- if .Values.existingConfigmap }}
+                  name: {{ .Values.existingConfigmap }}
+                  {{- else }}
+                  name: {{ include "upload.fullname" . }}
+                  {{- end }}
+                  key: retry_max_wait_seconds
+            - name: RETRY_EXPONENTIAL_MULTIPLIER
+              valueFrom:
+                configMapKeyRef:
+                  {{- if .Values.existingConfigmap }}
+                  name: {{ .Values.existingConfigmap }}
+                  {{- else }}
+                  name: {{ include "upload.fullname" . }}
+                  {{- end }}
+                  key: retry_exponential_multiplier
+            
+            - name: HEALTH_CHECK_CACHE_DURATION
+              valueFrom:
+                configMapKeyRef:
+                  {{- if .Values.existingConfigmap }}
+                  name: {{ .Values.existingConfigmap }}
+                  {{- else }}
+                  name: {{ include "upload.fullname" . }}
+                  {{- end }}
+                  key: health_check_cache_duration
+            - name: HEALTH_CHECK_TIMEOUT_SECONDS
+              valueFrom:
+                configMapKeyRef:
+                  {{- if .Values.existingConfigmap }}
+                  name: {{ .Values.existingConfigmap }}
+                  {{- else }}
+                  name: {{ include "upload.fullname" . }}
+                  {{- end }}
+                  key: health_check_timeout_seconds
           {{- with .Values.livenessProbe }}
           livenessProbe:
             {{- toYaml . | nindent 12 }}

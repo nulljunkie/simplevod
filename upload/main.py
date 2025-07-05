@@ -8,29 +8,44 @@ import motor.motor_asyncio
 import beanie
 from api.router import router
 from core.config import logger, mongo_config
+from core.connection_manager import get_connection_registry
 from models.models import StoredVideo
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Lifespan context manager for startup and shutdown events."""
-    logger.info("Initializing database...")
+    logger.info("Initializing application...")
+    
+    connection_registry = get_connection_registry()
+    
     try:
-        client = motor.motor_asyncio.AsyncIOMotorClient(
-            mongo_config.url,
-            serverSelectionTimeoutMS=10000,  # 10 second timeout
-            connectTimeoutMS=10000,
-            socketTimeoutMS=10000
-        )
+        logger.info("Initializing database...")
+        mongodb_client = await connection_registry.mongodb.get_client()
         await beanie.init_beanie(
-            database=client[mongo_config.db_name],
+            database=mongodb_client[mongo_config.db_name],
             document_models=[StoredVideo],
         )
         logger.info("Database initialized successfully.")
+        
+        logger.info("Warming up connections...")
+        health_status = await connection_registry.health_check_all(use_cache=False)
+        for service, is_healthy in health_status.items():
+            logger.info(f"{service}: {'healthy' if is_healthy else 'unhealthy'}")
+        
     except Exception as e:
-        logger.error(f"Database initialization failed: {e}")
-        # Don't fail startup, let readiness probe handle it
+        logger.error(f"Application initialization failed: {e}")
+        # Don't fail startup, readiness probe will handle it
+    
     yield
+    
+    # Cleanup on shutdown
     logger.info("Shutting down application...")
+    try:
+        await connection_registry.close_all()
+        logger.info("Connection cleanup completed.")
+    except Exception as e:
+        logger.error(f"Error during cleanup: {e}")
+    logger.info("Application shutdown complete.")
 
 class HealthCheckFilter(logging.Filter):
     """Filter out health check requests from logs when debug is disabled."""

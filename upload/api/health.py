@@ -1,9 +1,6 @@
-from typing import Annotated, Any, Dict
-from fastapi import APIRouter, HTTPException, status, Depends
-from .dependencies import get_redis_client, get_mongo_client, get_minio_client
-from core.redis import RedisClient
-from core.database import MongoDBClient
-from core.minio import MinioClient
+from typing import Any, Dict
+from fastapi import APIRouter, HTTPException, status
+from core.connection_manager import get_connection_registry
 from core.config import logger
 
 router = APIRouter(prefix="/health", tags=["health"])
@@ -14,20 +11,46 @@ async def liveness_probe() -> Dict[str, str]:
     return {"status": "ok"}
 
 @router.get("/readiness")
-async def readiness_probe(
-    redis: Annotated[RedisClient, Depends(get_redis_client)],
-    mongo: Annotated[MongoDBClient, Depends(get_mongo_client)],
-    minio: Annotated[MinioClient, Depends(get_minio_client)],
-) -> Dict[str, Any]:
-    """Check if all services are ready."""
+async def readiness_probe() -> Dict[str, Any]:
+    """Check if all services are ready using cached health checks."""
+    connection_registry = get_connection_registry()
+    
+    # Use cached health checks for efficiency
+    health_status = await connection_registry.health_check_all(use_cache=True)
+    
     services = {
-        "minio": "ok" if minio._client else "error",
-        "redis": "ok" if await redis.ping() else "error",
-        "mongodb": "ok" if await mongo.ping() else "error",
+        service: "ok" if is_healthy else "error"
+        for service, is_healthy in health_status.items()
     }
+    
     if all(status == "ok" for status in services.values()):
         return {"status": "ok", "services": services}
+    
     logger.warning(f"Readiness check failed: {services}")
+    raise HTTPException(
+        status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+        detail="One or more services are unavailable",
+        headers={"X-Services-Status": str(services)},
+    )
+
+
+@router.get("/readiness/fresh")
+async def readiness_probe_fresh() -> Dict[str, Any]:
+    """Check if all services are ready with fresh health checks (bypasses cache)."""
+    connection_registry = get_connection_registry()
+    
+    # Force fresh health checks (useful for debugging)
+    health_status = await connection_registry.health_check_all(use_cache=False)
+    
+    services = {
+        service: "ok" if is_healthy else "error"
+        for service, is_healthy in health_status.items()
+    }
+    
+    if all(status == "ok" for status in services.values()):
+        return {"status": "ok", "services": services}
+    
+    logger.warning(f"Fresh readiness check failed: {services}")
     raise HTTPException(
         status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
         detail="One or more services are unavailable",

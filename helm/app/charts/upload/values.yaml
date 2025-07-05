@@ -118,9 +118,25 @@ mongodb:
   host: ""
   port: 27017
   database: upload
+  maxPoolSize: 20
+  minPoolSize: 5
+  maxIdleTimeMs: 30000
+  serverSelectionTimeoutMs: 5000
 
 redis:
   host: ""
   port: 6379
   password: password
   db: 0
+  maxConnections: 20
+  healthCheckInterval: 30
+
+retry:
+  maxAttempts: 3
+  minWaitSeconds: 4
+  maxWaitSeconds: 10
+  exponentialMultiplier: 1
+
+healthCheck:
+  cacheDurationSeconds: 30
+  timeoutSeconds: 5

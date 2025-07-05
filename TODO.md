@@ -1,8 +1,6 @@
 - [ ] Test if Frontend works within and outside the cluster
-- [ ] Minio init container to wait to rabbitmq
-  - if you examinine values.yaml and README.md in the minio subchart, ??????????????????????????????? using addtional env, and config, to pass value to wait-for-rabbitmq init container or just harcore the values like rabbitmq host and port to field initContainer:
+
 - [ ] remove redis, mongodb, postgresql, and rabbitmq subchart and use helm depenndeycy to install them, but keep minio since this a custom modified version
-- [ ] upload service bad design create an instance and new connection to minio, mongo, and redis, create new instances of core services and classes at each time something happen, like just a minor regular health check? that's bad isn't need i think a single instance that create first and the dependency injection keeps passing that single instance for the hanlders and methods? the current implemenetation has one adnvantage it covers also the retry logic, by creating new connection each time? do we might need to go hyprid, mix of both approches?? or simple have a singleton or factory pattern??? then implementing a retry logic directly and concretely
 
 - [ ] make sure my apps
 
@@ -15,4 +13,12 @@
   - videos
   - transcoder
   - finalizer
-    --> if the subchart's own values.yaml does not define debug: with a value, use the the global from root chart's values.yaml
+    --> if the subchart's own values.yaml does not define debug: with a value, use the the global from root chart's values.yaml, this can be done with using "default" helm function
+
+### frontend
+
+- [ ] reload flicker issues
+  1. navbar show login/signup buttons for a moment, even when already logged in
+  2. home page reload, says no video found then shows the skeleton, it should start with skeleton and only show video not found when not are really found, this i suspect to be ssr issue
+  3. it's the same moment after home page relaod they both login/signup button and no vidoes found show, and both disapear after, navbar start to show upload icon and profile icon, and body start to load the skeleton
+  4. spinner while first starting to watch a video, the spinner fickers, it does not spin normally
