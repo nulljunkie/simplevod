@@ -712,12 +712,12 @@ transcoder:
   transcode:
     image: simplevod/transcode:latest
     preset: ultrafast
-    # resolutions: 240,360,480,720,1080
-    # crfMap: 240:36,360:34,480:32,720:30,1080:28
-    # masterPlaylist: 240:500000,360:800000,480:1200000,720:2000000,1080:5000000
-    resolutions: 240
-    crfMap: 240:36
-    masterPlaylist: 240:500000
+    resolutions: 240,360,480,720,1080
+    crfMap: 240:36,360:34,480:32,720:30,1080:28
+    masterPlaylist: 240:500000,360:800000,480:1200000,720:2000000,1080:5000000
+    # resolutions: 240
+    # crfMap: 240:36
+    # masterPlaylist: 240:500000
 
 
 playlist:
