@@ -3,9 +3,6 @@
 A Kubernative-native distributed video transcoding platform built for scale.
 
 [▶️ Watch Demo](https://youtu.be/M3rFq_hadHk)
-<video src="https://youtu.be/M3rFq_hadHk" autoplay loop muted playsinline></video>
-[![Demo](images/thumnail.png)](https://youtu.be/M3rFq_hadHk)
-
 
 ### Architecture
 
