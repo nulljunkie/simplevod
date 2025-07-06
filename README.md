@@ -2,17 +2,13 @@
 
 A Kubernative-native distributed video transcoding platform built for scale.
 
+[▶️ Watch Demo](https://youtu.be/M3rFq_hadHk)
+
 ### Architecture
 
 #### The Backend
 
 ![Backend Architecture](images/Architecture.jpg)
-https://github.com/nulljunkie/simplevod/blob/main/images/Demo.mp4
-
-[![Watch the video](https://raw.githubusercontent.com/nulljunkie/simplevod/branch/blob/main/images/thumbnail.png)](https://raw.githubusercontent.com/nulljunkie/simplevod/blob/main/images/Demo.mp4)
-[![Watch the video](images/thumbnail.png)](images/Demo.mp4)
-
-
 
 - **Auth**: Node.js/Express authentication service
 - **Users**: Python gRPC service for user management with Celery for background tasks (e.g. Sending account activation emails)
